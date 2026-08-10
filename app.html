@@ -1,0 +1,1594 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#4f46e5">
+<title>ADULAM · Sistema Pastoral</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+html,body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-tap-highlight-color:transparent}
+input:not([type=checkbox]):not([type=radio]):not([type=file]),select,textarea{font-size:16px;min-height:44px}
+@media(min-width:640px){input:not([type=checkbox]):not([type=radio]):not([type=file]),select,textarea{font-size:14px;min-height:auto}}
+@keyframes fi{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.afi{animation:fi .25s ease-out}
+@keyframes su{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.asu{animation:su .28s cubic-bezier(.16,1,.3,1)}
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px}
+.lc2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+@media print{#sidebar,#topbar,#bottomnav,.np{display:none!important}body{background:#fff!important}}
+.flyer{background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)}
+.diploma{background:linear-gradient(135deg,#fef3c7 0%,#fde68a 50%,#fcd34d 100%);border:8px double #92400e}
+</style>
+</head>
+<body class="bg-slate-50 min-h-screen">
+
+<!-- ===================== LOGIN ===================== -->
+<div id="loginView" class="hidden min-h-screen flex items-center justify-center p-4"
+     style="background-image:radial-gradient(at 25% 15%,rgba(99,102,241,.12) 0,transparent 50%),radial-gradient(at 75% 85%,rgba(139,92,246,.12) 0,transparent 50%)">
+  <div class="w-full max-w-md">
+    <div class="text-center mb-6">
+      <div class="inline-flex w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-700 items-center justify-center text-white text-3xl font-bold shadow-xl mb-4">A</div>
+      <h1 class="text-2xl font-bold text-slate-800">ADULAM</h1>
+      <p class="text-slate-500 text-sm mt-1">Sistema de Administración Pastoral</p>
+    </div>
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 p-6">
+      <div class="flex mb-6 bg-slate-100 rounded-xl p-1">
+        <button id="tabL" class="flex-1 py-2.5 font-semibold text-sm rounded-lg bg-white text-indigo-700 shadow-sm">Iniciar sesión</button>
+        <button id="tabR" class="flex-1 py-2.5 font-semibold text-sm rounded-lg text-slate-500">Registrarse</button>
+      </div>
+      <form id="formL" class="space-y-4">
+        <div><label class="block text-sm font-medium text-slate-700 mb-1">Correo electrónico</label>
+          <div class="relative"><i data-lucide="mail" class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+          <input type="email" id="lEmail" required autocomplete="email" class="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none"></div></div>
+        <div><label class="block text-sm font-medium text-slate-700 mb-1">Contraseña</label>
+          <div class="relative"><i data-lucide="lock" class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+          <input type="password" id="lPass" required autocomplete="current-password" class="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none"></div></div>
+        <button type="submit" class="w-full py-3 bg-gradient-to-r from-indigo-600 to-violet-700 text-white font-semibold rounded-xl flex items-center justify-center gap-2 active:scale-[.98] transition">
+          <i data-lucide="log-in" class="w-5 h-5"></i>Entrar</button>
+      </form>
+      <form id="formR" class="space-y-4 hidden">
+        <div><label class="block text-sm font-medium text-slate-700 mb-1">Nombre completo</label>
+          <div class="relative"><i data-lucide="user" class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+          <input type="text" id="rNom" required class="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-indigo-500"></div></div>
+        <div><label class="block text-sm font-medium text-slate-700 mb-1">Correo electrónico</label>
+          <div class="relative"><i data-lucide="mail" class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+          <input type="email" id="rEmail" required class="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-indigo-500"></div></div>
+        <div><label class="block text-sm font-medium text-slate-700 mb-1">Contraseña (mín. 6)</label>
+          <div class="relative"><i data-lucide="lock" class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+          <input type="password" id="rPass" minlength="6" required class="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-indigo-500"></div></div>
+        <button type="submit" class="w-full py-3 bg-gradient-to-r from-indigo-600 to-violet-700 text-white font-semibold rounded-xl flex items-center justify-center gap-2">
+          <i data-lucide="user-plus" class="w-5 h-5"></i>Crear cuenta</button>
+        <p class="text-xs text-slate-500 text-center">El rol será asignado por un administrador.</p>
+      </form>
+      <div id="loginMsg" class="mt-4 text-sm text-center"></div>
+    </div>
+    <p class="text-center text-xs text-slate-400 mt-6">ADULAM v4.0</p>
+  </div>
+</div>
+
+<!-- ===================== LOADER ===================== -->
+<div id="loaderView" class="min-h-screen flex items-center justify-center">
+  <div class="text-center">
+    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-700 flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4 animate-pulse">A</div>
+    <p class="text-slate-500 text-sm" id="loaderMsg">Cargando ADULAM...</p>
+  </div>
+</div>
+
+<!-- ===================== APP ===================== -->
+<div id="appView" class="hidden flex min-h-screen">
+  <div id="ovl" class="fixed inset-0 bg-black/50 z-30 hidden lg:hidden" onclick="closeNav()"></div>
+  <aside id="sidebar" class="fixed lg:sticky top-0 left-0 h-screen w-72 lg:w-64 bg-white border-r border-slate-200 z-40 -translate-x-full lg:translate-x-0 transition-transform flex flex-col shadow-xl lg:shadow-none">
+    <div class="p-4 border-b border-slate-200 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-700 flex items-center justify-center text-white font-bold">A</div>
+        <div><h1 class="font-bold text-slate-800 leading-tight">ADULAM</h1><p class="text-xs text-slate-500">Sistema Pastoral</p></div>
+      </div>
+      <button class="lg:hidden p-2 rounded-lg hover:bg-slate-100" onclick="closeNav()"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+    <nav id="navMenu" class="flex-1 p-3 space-y-1 overflow-y-auto"></nav>
+    <div class="p-4 border-t border-slate-200">
+      <div class="flex items-center gap-3 mb-3">
+        <div id="avatarIni" class="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold flex-shrink-0"></div>
+        <div class="min-w-0 flex-1"><div id="userName" class="text-sm font-medium text-slate-800 truncate"></div><div id="userRole" class="text-xs text-slate-500 capitalize"></div></div>
+      </div>
+      <button onclick="logout()" class="w-full text-sm px-3 py-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium flex items-center justify-center gap-2">
+        <i data-lucide="log-out" class="w-4 h-4"></i>Cerrar sesión</button>
+    </div>
+  </aside>
+  <main class="flex-1 min-h-screen pb-20 lg:pb-0 flex flex-col min-w-0">
+    <header id="topbar" class="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-slate-200 px-4 lg:px-8 py-3 flex items-center gap-3">
+      <button class="lg:hidden p-2 -ml-2 rounded-lg hover:bg-slate-100" onclick="openNav()"><i data-lucide="menu" class="w-6 h-6"></i></button>
+      <h2 id="pageTitle" class="text-lg lg:text-xl font-bold text-slate-800 truncate flex-1"></h2>
+    </header>
+    <div id="page" class="flex-1 p-4 lg:p-6"></div>
+  </main>
+  <nav id="bottomnav" class="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex z-30 shadow-lg"></nav>
+</div>
+
+<script>
+/* =====================================================================
+   ADULAM v4 · App autocontenida — solo fetch, sin librerías de auth
+   ===================================================================== */
+var URL_BASE = "https://nswgxgcibleayhmvajqr.supabase.co";
+var ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zd2d4Z2NpYmxlYXlobXZhanFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYyMzA0MDksImV4cCI6MjEwMTgwNjQwOX0.Ir2JnuGPHFjW8rwaPUC6QcVwhjJkAL1dRr8XTo4iWvY";
+var STORE = "adulam_v4_session";
+
+var S = { session:null, user:null, profile:null, cache:{} };
+
+/* ---------- utilidades ---------- */
+function ri(){ if(window.lucide) lucide.createIcons(); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function fecha(f){ if(!f) return '-'; try{ return new Date(f).toLocaleDateString('es-HN',{day:'2-digit',month:'2-digit',year:'numeric'}); }catch(e){return '-';} }
+function dinero(n){ if(n==null) return 'L 0.00'; return 'L '+Number(n).toLocaleString('es-HN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function hoy(){ return new Date().toISOString().slice(0,10); }
+
+function toast(msg,tipo){
+  var c={success:'bg-emerald-600',error:'bg-red-600',info:'bg-slate-800',warning:'bg-amber-600'};
+  var t=document.createElement('div');
+  t.className='fixed top-4 left-1/2 -translate-x-1/2 z-[60] px-5 py-3 rounded-full text-white text-sm font-medium shadow-2xl max-w-[90vw] afi '+(c[tipo]||c.info);
+  t.textContent=msg; document.body.appendChild(t);
+  setTimeout(function(){ t.style.opacity='0'; },2600);
+  setTimeout(function(){ t.remove(); },3000);
+}
+
+function modal(id,html){
+  var m=document.getElementById(id);
+  if(!m){ m=document.createElement('div'); m.id=id; m.className='fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm'; document.body.appendChild(m); }
+  m.innerHTML='<div class="bg-white w-full sm:max-w-lg sm:w-[92%] sm:rounded-2xl rounded-t-2xl max-h-[92vh] overflow-y-auto shadow-2xl asu">'+html+'</div>';
+  m.onclick=function(e){ if(e.target===m) closeModal(id); };
+  document.body.style.overflow='hidden'; setTimeout(ri,30);
+}
+function closeModal(id){ var m=document.getElementById(id); if(m) m.remove(); document.body.style.overflow=''; }
+function mHead(t,id){ return '<div class="sticky top-0 bg-white border-b border-slate-200 p-4 flex items-center justify-between z-10"><h3 class="text-lg font-bold">'+t+'</h3><button type="button" onclick="closeModal(\''+id+'\')" class="p-2 hover:bg-slate-100 rounded-lg"><i data-lucide="x" class="w-5 h-5"></i></button></div>'; }
+function mFoot(id,txt){ return '<div class="flex gap-2 pt-2"><button type="button" onclick="closeModal(\''+id+'\')" class="flex-1 py-3 bg-slate-100 hover:bg-slate-200 rounded-xl font-medium">Cancelar</button><button type="submit" class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold">'+(txt||'Guardar')+'</button></div>'; }
+function vacio(icon,txt){ return '<div class="col-span-full text-center py-12 text-slate-400"><i data-lucide="'+icon+'" class="w-12 h-12 mx-auto mb-3 opacity-40"></i><p>'+txt+'</p></div>'; }
+
+/* ---------- capa de red (fetch con timeout) ---------- */
+function req(path, opts, ms){
+  ms = ms || 12000;
+  opts = opts || {};
+  var ctrl = new AbortController();
+  var timer = setTimeout(function(){ ctrl.abort(); }, ms);
+  opts.signal = ctrl.signal;
+  opts.headers = opts.headers || {};
+  opts.headers.apikey = ANON;
+  if (S.session && S.session.access_token) opts.headers.Authorization = 'Bearer '+S.session.access_token;
+  return fetch(URL_BASE+path, opts)
+    .then(function(r){ clearTimeout(timer); return r; })
+    .catch(function(e){ clearTimeout(timer); throw new Error(e.name==='AbortError'?'Tiempo de espera agotado':e.message); });
+}
+
+/* db: helpers PostgREST */
+async function dbGet(tabla, query){
+  var r = await req('/rest/v1/'+tabla+(query?'?'+query:''), { headers:{ 'Accept':'application/json' } });
+  if(!r.ok){ var e=await r.text(); throw new Error(e); }
+  return r.json();
+}
+async function dbPost(tabla, body, prefer){
+  var r = await req('/rest/v1/'+tabla, { method:'POST', headers:{ 'Content-Type':'application/json', 'Prefer': prefer||'return=representation' }, body: JSON.stringify(body) });
+  if(!r.ok){ var e=await r.text(); throw new Error(e); }
+  var t = await r.text(); return t?JSON.parse(t):null;
+}
+async function dbPatch(tabla, query, body){
+  var r = await req('/rest/v1/'+tabla+'?'+query, { method:'PATCH', headers:{ 'Content-Type':'application/json', 'Prefer':'return=representation' }, body: JSON.stringify(body) });
+  if(!r.ok){ var e=await r.text(); throw new Error(e); }
+  var t = await r.text(); return t?JSON.parse(t):null;
+}
+async function dbDel(tabla, query){
+  var r = await req('/rest/v1/'+tabla+'?'+query, { method:'DELETE', headers:{'Prefer':'return=minimal'} });
+  if(!r.ok){ var e=await r.text(); throw new Error(e); }
+  return true;
+}
+async function dbUpsert(tabla, body, onConflict){
+  var r = await req('/rest/v1/'+tabla+(onConflict?'?on_conflict='+onConflict:''), {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'Prefer':'resolution=merge-duplicates,return=representation' },
+    body: JSON.stringify(body)
+  });
+  if(!r.ok){ var e=await r.text(); throw new Error(e); }
+  var t=await r.text(); return t?JSON.parse(t):null;
+}
+
+/* ---------- sesión ---------- */
+function saveSession(s){ try{ localStorage.setItem(STORE, JSON.stringify(s)); }catch(e){} S.session=s; }
+function loadSession(){ try{ var r=localStorage.getItem(STORE); if(!r) return null; var s=JSON.parse(r); return (s&&s.access_token)?s:null; }catch(e){ return null; } }
+function clearSession(){
+  try{
+    localStorage.removeItem(STORE);
+    Object.keys(localStorage).forEach(function(k){ if(k.indexOf('sb-')===0||k.indexOf('supabase')!==-1||k.indexOf('adulam')===0) localStorage.removeItem(k); });
+  }catch(e){}
+  S.session=null; S.user=null; S.profile=null;
+}
+function expirada(s){ return !s || !s.expires_at || (Date.now()/1000) > (s.expires_at-60); }
+
+async function login(email, pass){
+  var r = await req('/auth/v1/token?grant_type=password', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ email:email, password:pass })
+  }, 15000);
+  var d = await r.json();
+  if(!r.ok) throw new Error(d.error_description||d.msg||d.message||'Credenciales inválidas');
+  d.expires_at = Math.floor(Date.now()/1000)+(d.expires_in||3600);
+  saveSession(d); S.user=d.user;
+  await cargarPerfil();
+  return d;
+}
+async function registrar(email, pass, nombre){
+  var r = await req('/auth/v1/signup', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ email:email, password:pass, data:{ nombre:nombre, rol:'miembro' } })
+  }, 15000);
+  var d = await r.json();
+  if(!r.ok) throw new Error(d.error_description||d.msg||d.message||'No se pudo registrar');
+  return d;
+}
+async function refrescar(rt){
+  try{
+    var r = await req('/auth/v1/token?grant_type=refresh_token', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ refresh_token: rt })
+    }, 10000);
+    if(!r.ok) return null;
+    var d = await r.json();
+    if(!d.access_token) return null;
+    d.expires_at = Math.floor(Date.now()/1000)+(d.expires_in||3600);
+    saveSession(d); return d;
+  }catch(e){ return null; }
+}
+async function cargarPerfil(){
+  if(!S.user) return null;
+  var fb = { id:S.user.id, nombre:(S.user.user_metadata&&S.user.user_metadata.nombre)||(S.user.email||'').split('@')[0], email:S.user.email, rol:'miembro' };
+  try{
+    var rows = await dbGet('profiles','id=eq.'+S.user.id+'&select=*');
+    S.profile = (rows&&rows[0]) ? rows[0] : fb;
+  }catch(e){ S.profile = fb; }
+  return S.profile;
+}
+async function logout(){
+  try{ await req('/auth/v1/logout',{method:'POST'},5000); }catch(e){}
+  clearSession(); location.reload();
+}
+function rol(){ return S.profile ? S.profile.rol : 'miembro'; }
+function puede(roles){ return roles.indexOf(rol())!==-1; }
+
+/* ---------- navegación ---------- */
+var MENU = [
+  { id:'dashboard',    icon:'layout-dashboard', label:'Dashboard',      roles:['pastor','lider','servidor','miembro'] },
+  { id:'members',      icon:'users',            label:'Membresía',      roles:['pastor','lider','servidor'] },
+  { id:'families',     icon:'home',             label:'Familias',       roles:['pastor','lider','servidor'] },
+  { id:'houses',       icon:'wheat',            label:'Casas de Pan',   roles:['pastor','lider','servidor'] },
+  { id:'teams',        icon:'target',           label:'Ministerios',    roles:['pastor','lider','servidor'] },
+  { id:'attendance',   icon:'clipboard-check',  label:'Asistencia',     roles:['pastor','lider','servidor'] },
+  { id:'discipleship', icon:'book-open',        label:'Discipulado',    roles:['pastor','lider','servidor'] },
+  { id:'services',     icon:'calendar-days',    label:'Servicios',      roles:['pastor','lider','servidor'] },
+  { id:'treasury',     icon:'wallet',           label:'Tesorería',      roles:['pastor','lider'] },
+  { id:'social',       icon:'share-2',          label:'Redes Sociales', roles:['pastor','lider','servidor'] },
+  { id:'automations',  icon:'zap',              label:'Automatización', roles:['pastor','lider'] }
+];
+var vistaActual='dashboard';
+
+function openNav(){ document.getElementById('sidebar').classList.remove('-translate-x-full'); document.getElementById('ovl').classList.remove('hidden'); document.body.style.overflow='hidden'; }
+function closeNav(){ document.getElementById('sidebar').classList.add('-translate-x-full'); document.getElementById('ovl').classList.add('hidden'); document.body.style.overflow=''; }
+
+function pintarMenu(){
+  var r = rol();
+  document.getElementById('navMenu').innerHTML = MENU.filter(function(m){ return m.roles.indexOf(r)!==-1; }).map(function(m){
+    var act = vistaActual===m.id;
+    return '<button onclick="ir(\''+m.id+'\')" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition text-left '+(act?'bg-indigo-600 text-white font-semibold':'text-slate-700 hover:bg-slate-100')+'"><i data-lucide="'+m.icon+'" class="w-5 h-5 flex-shrink-0"></i><span class="truncate">'+m.label+'</span></button>';
+  }).join('');
+  var bn=[{id:'dashboard',icon:'layout-dashboard',l:'Inicio'},{id:'members',icon:'users',l:'Miembros'},{id:'attendance',icon:'clipboard-check',l:'Asist.'},{id:'services',icon:'calendar-days',l:'Cultos'}];
+  document.getElementById('bottomnav').innerHTML = bn.map(function(m){
+    var act=vistaActual===m.id;
+    return '<button onclick="ir(\''+m.id+'\')" class="flex flex-col items-center gap-0.5 flex-1 py-2 '+(act?'text-indigo-600':'text-slate-500')+'"><i data-lucide="'+m.icon+'" class="w-5 h-5"></i><span class="text-[10px] font-medium">'+m.l+'</span></button>';
+  }).join('');
+  ri();
+}
+
+function ir(id){
+  var m = MENU.filter(function(x){ return x.id===id; })[0];
+  if(m && !puede(m.roles)){ toast('Sin permiso para esta sección','warning'); return; }
+  vistaActual = id;
+  closeNav();
+  document.getElementById('pageTitle').textContent = m ? m.label : '';
+  document.getElementById('page').innerHTML = '<div class="text-center py-12 text-slate-400"><i data-lucide="loader-circle" class="w-8 h-8 mx-auto animate-spin"></i></div>';
+  ri(); pintarMenu();
+  var fn = window['view_'+id];
+  if(fn) fn().catch(function(e){ errorPagina(e); });
+  else document.getElementById('page').innerHTML = vacio('construction','Módulo en desarrollo.');
+}
+
+function errorPagina(e){
+  document.getElementById('page').innerHTML =
+    '<div class="bg-red-50 border border-red-200 rounded-2xl p-5"><h3 class="font-bold text-red-800 mb-1">Ocurrió un error</h3>'+
+    '<p class="text-sm text-red-700 font-mono break-words">'+esc(e.message||e)+'</p>'+
+    '<button onclick="ir(vistaActual)" class="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium">Reintentar</button></div>';
+  console.error(e);
+}
+
+/* ---------- catálogos en caché ---------- */
+async function cat(nombre, query){
+  if(S.cache[nombre]) return S.cache[nombre];
+  S.cache[nombre] = await dbGet(nombre, query);
+  return S.cache[nombre];
+}
+function limpiarCache(n){ if(n) delete S.cache[n]; else S.cache={}; }
+
+/* =====================================================================
+   VISTAS
+   ===================================================================== */
+
+/* ---------- DASHBOARD ---------- */
+async function view_dashboard(){
+  var p = document.getElementById('page');
+  var nombre = (S.profile.nombre||'Usuario').split(' ')[0];
+  p.innerHTML =
+   '<div class="mb-5"><h3 class="text-xl sm:text-2xl font-bold text-slate-800">Bienvenido, '+esc(nombre)+'</h3>'+
+   '<p class="text-sm text-slate-500 mt-0.5">Panorama general de ADULAM</p></div>'+
+   '<div id="stats" class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 mb-6"></div>'+
+   '<div class="grid lg:grid-cols-2 gap-4">'+
+     '<div class="bg-white rounded-2xl border border-slate-200 p-5"><h4 class="font-bold text-slate-800 mb-4 flex items-center gap-2"><i data-lucide="zap" class="w-5 h-5 text-amber-500"></i>Acciones rápidas</h4>'+
+     '<div class="grid grid-cols-2 gap-3">'+
+       accion('members','user-plus','indigo','Nuevo miembro')+
+       accion('attendance','clipboard-check','emerald','Tomar asistencia')+
+       accion('services','calendar-days','amber','Planificar culto')+
+       accion('discipleship','book-open','violet','Discipulado')+
+     '</div></div>'+
+     '<div class="bg-white rounded-2xl border border-slate-200 p-5"><h4 class="font-bold text-slate-800 mb-4 flex items-center gap-2"><i data-lucide="bell" class="w-5 h-5 text-rose-500"></i>Últimas alertas</h4>'+
+     '<div id="alertas" class="space-y-2 text-sm"></div></div>'+
+   '</div>';
+  ri();
+
+  try{
+    var d = (await dbGet('v_dashboard','select=*'))[0]||{};
+    document.getElementById('stats').innerHTML =
+      stat('users','Miembros activos',d.total_miembros||0,'indigo')+
+      stat('sparkles','Nuevos (30d)',d.nuevos_miembros||0,'emerald')+
+      stat('book-open','En discipulado',d.en_discipulado||0,'violet')+
+      stat('user-minus','Inactivos',d.inactivos||0,'slate')+
+      stat('hand-heart','Asist. semanal',d.asistencia_semanal||0,'amber')+
+      stat('wallet','Balance mes',dinero(d.balance_mes||0),'rose');
+    ri();
+  }catch(e){ document.getElementById('stats').innerHTML='<div class="col-span-full text-sm bg-amber-50 text-amber-800 rounded-xl p-4">No se cargaron estadísticas: '+esc(e.message)+'</div>'; }
+
+  try{
+    var al = await dbGet('automation_logs','select=*&order=created_at.desc&limit=5');
+    var c = document.getElementById('alertas');
+    c.innerHTML = (!al||!al.length) ? '<p class="text-slate-400 text-center py-4">Sin alertas por ahora.</p>' :
+      al.map(function(a){
+        var ic = a.tipo==='inactividad'?'user-minus':(a.tipo==='sin_discipulador'?'alert-triangle':'sparkles');
+        return '<div class="flex items-start gap-3 p-3 rounded-xl hover:bg-slate-50"><div class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center flex-shrink-0"><i data-lucide="'+ic+'" class="w-4 h-4"></i></div><div class="flex-1 min-w-0"><div class="text-sm text-slate-700">'+esc(a.mensaje)+'</div><div class="text-xs text-slate-400 mt-0.5">'+fecha(a.created_at)+'</div></div></div>';
+      }).join('');
+    ri();
+  }catch(e){ document.getElementById('alertas').innerHTML='<p class="text-slate-400 text-center py-4">Sin datos.</p>'; }
+}
+function stat(ic,label,val,color){
+  return '<div class="bg-white rounded-2xl border border-slate-200 p-4 hover:shadow-md transition">'+
+    '<div class="w-10 h-10 rounded-xl bg-'+color+'-100 text-'+color+'-600 flex items-center justify-center mb-3"><i data-lucide="'+ic+'" class="w-5 h-5"></i></div>'+
+    '<div class="text-xs font-medium text-slate-500 mb-1">'+label+'</div>'+
+    '<div class="text-2xl font-bold text-'+color+'-700 leading-tight">'+val+'</div></div>';
+}
+function accion(id,ic,color,label){
+  return '<button onclick="ir(\''+id+'\')" class="p-4 bg-'+color+'-50 hover:bg-'+color+'-100 active:scale-[.97] rounded-xl transition text-left">'+
+    '<div class="w-10 h-10 rounded-xl bg-'+color+'-600 text-white flex items-center justify-center mb-2"><i data-lucide="'+ic+'" class="w-5 h-5"></i></div>'+
+    '<div class="text-sm font-semibold text-'+color+'-700">'+label+'</div></button>';
+}
+
+/* ---------- MEMBRESÍA ---------- */
+var ESTADOS=['nuevo','discipulado','bautizado','lider','inactivo'];
+var COL_EST={nuevo:'bg-blue-100 text-blue-700',discipulado:'bg-violet-100 text-violet-700',bautizado:'bg-emerald-100 text-emerald-700',lider:'bg-amber-100 text-amber-700',inactivo:'bg-slate-200 text-slate-600'};
+
+async function view_members(){
+  var p=document.getElementById('page');
+  p.innerHTML =
+   '<div class="flex flex-col sm:flex-row gap-2 mb-4">'+
+     '<div class="relative flex-1"><i data-lucide="search" class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>'+
+     '<input id="mBuscar" placeholder="Buscar nombre o teléfono..." class="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-indigo-500"></div>'+
+     '<div class="flex gap-2"><select id="mEstado" class="flex-1 sm:flex-none px-3 py-3 rounded-xl border border-slate-300 bg-white"><option value="">Todos</option>'+
+     ESTADOS.map(function(e){return '<option value="'+e+'">'+e+'</option>';}).join('')+'</select>'+
+     (puede(['pastor','lider','servidor'])?'<button onclick="formMiembro()" class="px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl flex items-center gap-2"><i data-lucide="plus" class="w-5 h-5"></i><span class="hidden sm:inline">Nuevo</span></button>':'')+
+     '</div></div>'+
+   '<div id="mLista" class="grid gap-3"></div>';
+  ri();
+  await Promise.all([ cat('families','select=*&order=nombre_familia'), cat('teams','select=*&order=nombre'), cat('houses','select=*&order=nombre') ]);
+  document.getElementById('mBuscar').oninput = pintarMiembros;
+  document.getElementById('mEstado').onchange = pintarMiembros;
+  await pintarMiembros();
+}
+
+async function pintarMiembros(){
+  var q=(document.getElementById('mBuscar').value||'').trim().toLowerCase();
+  var est=document.getElementById('mEstado').value;
+  var query='select=*,families(nombre_familia),member_teams(teams(id,nombre)),member_houses(houses(id,nombre))&order=nombre';
+  if(est) query+='&estado_espiritual=eq.'+est;
+  var d = await dbGet('members', query);
+  if(q) d=d.filter(function(m){ return (m.nombre||'').toLowerCase().indexOf(q)!==-1 || (m.telefono||'').toLowerCase().indexOf(q)!==-1; });
+  var L=document.getElementById('mLista');
+  if(!d.length){ L.innerHTML=vacio('users','Sin miembros registrados.'); ri(); return; }
+  L.innerHTML = d.map(function(m){
+    var mins=(m.member_teams||[]).map(function(t){return t.teams?t.teams.nombre:null;}).filter(Boolean);
+    var cas=(m.member_houses||[]).map(function(h){return h.houses?h.houses.nombre:null;}).filter(Boolean);
+    return '<div class="bg-white rounded-2xl border border-slate-200 p-3 sm:p-4 flex items-center gap-3 hover:shadow-md transition">'+
+      '<div class="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-bold text-lg overflow-hidden flex-shrink-0">'+
+        (m.foto_url?'<img src="'+esc(m.foto_url)+'" class="w-full h-full object-cover">':esc((m.nombre||'?')[0].toUpperCase()))+'</div>'+
+      '<div class="flex-1 min-w-0 cursor-pointer" onclick="perfilMiembro(\''+m.id+'\')">'+
+        '<div class="font-semibold text-slate-800 truncate">'+esc(m.nombre)+'</div>'+
+        '<div class="text-xs text-slate-500 flex flex-wrap gap-x-3">'+
+          (m.telefono?'<span>'+esc(m.telefono)+'</span>':'')+
+          (m.families?'<span>'+esc(m.families.nombre_familia)+'</span>':'')+
+          (mins.length?'<span>'+esc(mins.slice(0,2).join(', '))+'</span>':'')+
+          (cas.length?'<span>'+esc(cas.slice(0,1).join(', '))+'</span>':'')+
+        '</div>'+
+        '<span class="inline-block mt-1 px-2 py-0.5 text-[10px] font-semibold rounded-full '+(COL_EST[m.estado_espiritual]||'')+'">'+esc(m.estado_espiritual)+'</span>'+
+      '</div>'+
+      '<div class="flex flex-col gap-1 flex-shrink-0">'+
+        (puede(['pastor','lider','servidor'])?'<button onclick="editarMiembro(\''+m.id+'\')" class="p-2 hover:bg-slate-100 rounded-lg text-slate-600"><i data-lucide="pencil" class="w-4 h-4"></i></button>':'')+
+        (puede(['pastor'])?'<button onclick="borrarMiembro(\''+m.id+'\',\''+esc(m.nombre).replace(/'/g,"")+'\')" class="p-2 hover:bg-red-100 rounded-lg text-red-600"><i data-lucide="trash-2" class="w-4 h-4"></i></button>':'')+
+      '</div></div>';
+  }).join('');
+  ri();
+}
+
+async function editarMiembro(id){
+  var d = await dbGet('members','id=eq.'+id+'&select=*,member_teams(team_id),member_houses(house_id)');
+  formMiembro(d[0]);
+}
+
+function formMiembro(m){
+  m=m||{};
+  var ta=(m.member_teams||[]).map(function(x){return x.team_id;});
+  var ha=(m.member_houses||[]).map(function(x){return x.house_id;});
+  var fams=S.cache.families||[], teams=S.cache.teams||[], houses=S.cache.houses||[];
+  var html = mHead((m.id?'Editar':'Nuevo')+' miembro','mM')+
+   '<form id="fM" class="p-4 space-y-4">'+
+   '<div><label class="text-sm font-medium text-slate-700">Nombre completo *</label><input name="nombre" required value="'+esc(m.nombre||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+   '<div class="grid grid-cols-2 gap-3">'+
+     '<div><label class="text-sm font-medium text-slate-700">Teléfono</label><input name="telefono" inputmode="tel" value="'+esc(m.telefono||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+     '<div><label class="text-sm font-medium text-slate-700">Nacimiento</label><input name="fecha_nacimiento" type="date" value="'+esc(m.fecha_nacimiento||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+   '</div>'+
+   '<div><label class="text-sm font-medium text-slate-700">Dirección</label><input name="direccion" value="'+esc(m.direccion||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+   '<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">'+
+     '<div><label class="text-sm font-medium text-slate-700">Familia</label><select name="familia_id" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"><option value="">Sin asignar</option>'+
+       fams.map(function(f){return '<option value="'+f.id+'"'+(m.familia_id===f.id?' selected':'')+'>'+esc(f.nombre_familia)+'</option>';}).join('')+'</select></div>'+
+     '<div><label class="text-sm font-medium text-slate-700">Estado espiritual</label><select name="estado_espiritual" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg">'+
+       ESTADOS.map(function(e){return '<option value="'+e+'"'+(m.estado_espiritual===e?' selected':'')+'>'+e+'</option>';}).join('')+'</select></div>'+
+   '</div>'+
+   '<div><label class="text-sm font-medium text-slate-700 flex items-center gap-1.5"><i data-lucide="target" class="w-4 h-4"></i>Ministerios <span class="text-xs text-slate-400 font-normal">(varios)</span></label>'+
+     '<div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-1 max-h-36 overflow-y-auto border border-slate-200 rounded-lg p-1.5">'+
+     (teams.length?teams.map(function(t){return '<label class="flex items-center gap-2 p-2.5 bg-slate-50 hover:bg-indigo-50 rounded-lg cursor-pointer"><input type="checkbox" name="teams" value="'+t.id+'"'+(ta.indexOf(t.id)!==-1?' checked':'')+' class="accent-indigo-600 w-4 h-4"><span class="text-sm">'+esc(t.nombre)+'</span></label>';}).join(''):'<p class="text-xs text-slate-400 p-2">Sin ministerios creados.</p>')+
+     '</div></div>'+
+   '<div><label class="text-sm font-medium text-slate-700 flex items-center gap-1.5"><i data-lucide="wheat" class="w-4 h-4"></i>Casas de Pan <span class="text-xs text-slate-400 font-normal">(varias)</span></label>'+
+     '<div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-1 max-h-36 overflow-y-auto border border-slate-200 rounded-lg p-1.5">'+
+     (houses.length?houses.map(function(h){return '<label class="flex items-center gap-2 p-2.5 bg-slate-50 hover:bg-amber-50 rounded-lg cursor-pointer"><input type="checkbox" name="houses" value="'+h.id+'"'+(ha.indexOf(h.id)!==-1?' checked':'')+' class="accent-amber-600 w-4 h-4"><span class="text-sm">'+esc(h.nombre)+'</span></label>';}).join(''):'<p class="text-xs text-slate-400 p-2">Sin casas creadas.</p>')+
+     '</div></div>'+
+   '<div><label class="text-sm font-medium text-slate-700">Foto (máx 2MB)</label><input name="foto" type="file" accept="image/*" class="w-full mt-1 text-sm file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700">'+
+     (m.foto_url?'<img src="'+esc(m.foto_url)+'" class="w-16 h-16 rounded-full object-cover mt-2">':'')+'</div>'+
+   '<div><label class="text-sm font-medium text-slate-700">Notas</label><textarea name="notas" rows="2" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg">'+esc(m.notas||'')+'</textarea></div>'+
+   mFoot('mM')+'</form>';
+  modal('mM',html);
+
+  document.getElementById('fM').onsubmit = async function(e){
+    e.preventDefault();
+    var btn=e.target.querySelector('button[type=submit]');
+    btn.disabled=true; btn.textContent='Guardando...';
+    try{
+      var fd=new FormData(e.target);
+      var body={ nombre:fd.get('nombre'), telefono:fd.get('telefono')||null, direccion:fd.get('direccion')||null,
+        familia_id:fd.get('familia_id')||null, estado_espiritual:fd.get('estado_espiritual'),
+        fecha_nacimiento:fd.get('fecha_nacimiento')||null, notas:fd.get('notas')||null };
+
+      var foto=fd.get('foto');
+      if(foto && foto.size>0){
+        if(foto.size>2*1024*1024){ toast('La foto supera 2MB, se guarda sin foto','warning'); }
+        else {
+          // La foto NUNCA debe impedir guardar al miembro
+          try{
+            var ext=(foto.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,5)||'jpg';
+            var path='members/'+Date.now()+'_'+Math.random().toString(36).slice(2,8)+'.'+ext;
+            var up=await req('/storage/v1/object/member-photos/'+path,{ method:'POST', headers:{'Content-Type':foto.type||'image/jpeg'}, body:foto },20000);
+            if(up.ok) body.foto_url=URL_BASE+'/storage/v1/object/public/member-photos/'+path;
+            else toast('No se pudo subir la foto, se guarda sin ella','warning');
+          }catch(fe){ toast('Foto no subida ('+fe.message.slice(0,40)+'), se guarda sin ella','warning'); }
+        }
+      }
+
+      var mid=m.id;
+      if(mid){ await dbPatch('members','id=eq.'+mid, body); }
+      else { var res=await dbPost('members', body); mid=res[0].id; }
+
+      var ts=Array.prototype.slice.call(e.target.querySelectorAll('input[name=teams]:checked')).map(function(c){return c.value;});
+      var hs=Array.prototype.slice.call(e.target.querySelectorAll('input[name=houses]:checked')).map(function(c){return c.value;});
+      await dbDel('member_teams','member_id=eq.'+mid);
+      if(ts.length) await dbPost('member_teams', ts.map(function(t){return {member_id:mid,team_id:t};}), 'return=minimal');
+      await dbDel('member_houses','member_id=eq.'+mid);
+      if(hs.length) await dbPost('member_houses', hs.map(function(h){return {member_id:mid,house_id:h};}), 'return=minimal');
+
+      toast('Miembro guardado','success'); closeModal('mM'); pintarMiembros();
+    }catch(err){ toast(err.message.slice(0,120),'error'); btn.disabled=false; btn.textContent='Guardar'; }
+  };
+}
+
+async function borrarMiembro(id,nombre){
+  if(!confirm('¿Eliminar a '+nombre+'?')) return;
+  try{ await dbDel('members','id=eq.'+id); toast('Eliminado','success'); pintarMiembros(); }
+  catch(e){ toast(e.message.slice(0,120),'error'); }
+}
+
+async function perfilMiembro(id){
+  try{
+    var d=(await dbGet('members','id=eq.'+id+'&select=*,families(nombre_familia),member_teams(teams(nombre)),member_houses(houses(nombre))'))[0];
+    var att=await dbGet('attendance','member_id=eq.'+id+'&select=*&order=fecha.desc&limit=10');
+    var mins=(d.member_teams||[]).map(function(t){return t.teams?t.teams.nombre:null;}).filter(Boolean);
+    var cas=(d.member_houses||[]).map(function(h){return h.houses?h.houses.nombre:null;}).filter(Boolean);
+    var asis = att.length ? att.map(function(a){
+      return '<div class="flex justify-between text-sm py-2 border-b border-slate-100 last:border-0"><span>'+fecha(a.fecha)+' · '+esc(a.tipo_reunion)+'</span><span>'+(a.asistio?'<i data-lucide="check" class="w-4 h-4 text-emerald-600 inline"></i>':'<i data-lucide="x" class="w-4 h-4 text-red-500 inline"></i>')+'</span></div>';
+    }).join('') : '<p class="text-slate-400 text-sm">Sin registros</p>';
+    modal('mP', mHead('Perfil','mP')+'<div class="p-4">'+
+      '<div class="flex items-center gap-4 mb-4"><div class="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-2xl font-bold overflow-hidden">'+
+      (d.foto_url?'<img src="'+esc(d.foto_url)+'" class="w-full h-full object-cover">':esc(d.nombre[0].toUpperCase()))+'</div>'+
+      '<div class="min-w-0"><h3 class="text-xl font-bold truncate">'+esc(d.nombre)+'</h3><p class="text-slate-500 text-sm capitalize">'+esc(d.estado_espiritual)+'</p>'+
+      (d.telefono?'<p class="text-sm mt-1">'+esc(d.telefono)+'</p>':'')+'</div></div>'+
+      '<div class="space-y-2 text-sm bg-slate-50 rounded-xl p-3">'+
+      (d.direccion?'<div><b>Dirección:</b> '+esc(d.direccion)+'</div>':'')+
+      (d.families?'<div><b>Familia:</b> '+esc(d.families.nombre_familia)+'</div>':'')+
+      (mins.length?'<div><b>Ministerios:</b> '+esc(mins.join(', '))+'</div>':'')+
+      (cas.length?'<div><b>Casas de Pan:</b> '+esc(cas.join(', '))+'</div>':'')+
+      (d.notas?'<div><b>Notas:</b> '+esc(d.notas)+'</div>':'')+'</div>'+
+      '<div class="mt-4"><h4 class="font-semibold mb-2">Últimas asistencias</h4><div class="bg-white border border-slate-200 rounded-xl p-3">'+asis+'</div></div>'+
+      '<button onclick="closeModal(\'mP\')" class="mt-4 w-full py-3 bg-slate-100 rounded-xl font-medium">Cerrar</button></div>');
+  }catch(e){ toast(e.message.slice(0,120),'error'); }
+}
+
+/* ---------- FAMILIAS ---------- */
+async function view_families(){
+  var p=document.getElementById('page');
+  p.innerHTML=(puede(['pastor','lider','servidor'])?'<div class="mb-5"><button onclick="formFamilia()" class="px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl flex items-center gap-2"><i data-lucide="plus" class="w-5 h-5"></i>Nueva familia</button></div>':'')+
+    '<div id="fGrid" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>';
+  ri(); await pintarFamilias();
+}
+async function pintarFamilias(){
+  var fams=await dbGet('families','select=*&order=nombre_familia');
+  var mem=await dbGet('members','select=id,nombre,familia_id');
+  limpiarCache('families');
+  var g=document.getElementById('fGrid');
+  if(!fams.length){ g.innerHTML=vacio('home','Sin familias registradas.'); ri(); return; }
+  g.innerHTML=fams.map(function(f){
+    var ints=mem.filter(function(m){return m.familia_id===f.id;});
+    return '<div class="bg-white rounded-2xl border border-slate-200 p-5"><div class="flex items-start justify-between mb-3">'+
+      '<div class="flex items-center gap-2"><div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center"><i data-lucide="home" class="w-5 h-5"></i></div>'+
+      '<h4 class="font-bold text-slate-800">'+esc(f.nombre_familia)+'</h4></div>'+
+      '<div class="flex gap-1">'+(puede(['pastor','lider','servidor'])?'<button onclick="formFamilia({id:\''+f.id+'\',nombre_familia:\''+esc(f.nombre_familia).replace(/'/g,"")+'\'})" class="p-1.5 hover:bg-slate-100 rounded-lg"><i data-lucide="pencil" class="w-4 h-4"></i></button>':'')+
+      (puede(['pastor'])?'<button onclick="borrarFamilia(\''+f.id+'\',\''+esc(f.nombre_familia).replace(/'/g,"")+'\')" class="p-1.5 text-red-600 hover:bg-red-100 rounded-lg"><i data-lucide="trash-2" class="w-4 h-4"></i></button>':'')+'</div></div>'+
+      '<p class="text-xs text-slate-500 mb-3">'+ints.length+' integrante'+(ints.length!==1?'s':'')+'</p>'+
+      '<div class="space-y-1">'+ints.slice(0,5).map(function(m){return '<div class="text-sm text-slate-700 flex items-center gap-1.5"><i data-lucide="user" class="w-3 h-3 text-slate-400"></i>'+esc(m.nombre)+'</div>';}).join('')+
+      (ints.length>5?'<div class="text-xs text-slate-400 pl-4">+'+(ints.length-5)+' más</div>':'')+'</div></div>';
+  }).join('');
+  ri();
+}
+function formFamilia(f){
+  f=f||{};
+  modal('mF', mHead((f.id?'Editar':'Nueva')+' familia','mF')+
+    '<form id="fF" class="p-4 space-y-3"><div><label class="text-sm font-medium">Nombre de la familia *</label>'+
+    '<input name="nombre_familia" required value="'+esc(f.nombre_familia||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+mFoot('mF')+'</form>');
+  document.getElementById('fF').onsubmit=async function(e){
+    e.preventDefault();
+    try{
+      var v=new FormData(e.target).get('nombre_familia');
+      if(f.id) await dbPatch('families','id=eq.'+f.id,{nombre_familia:v});
+      else await dbPost('families',{nombre_familia:v});
+      limpiarCache('families'); toast('Guardado','success'); closeModal('mF'); pintarFamilias();
+    }catch(err){ toast(err.message.slice(0,120),'error'); }
+  };
+}
+async function borrarFamilia(id,n){
+  if(!confirm('¿Eliminar "'+n+'"?')) return;
+  try{ await dbDel('families','id=eq.'+id); limpiarCache('families'); toast('Eliminada','success'); pintarFamilias(); }
+  catch(e){ toast(e.message.slice(0,120),'error'); }
+}
+
+/* ---------- CASAS DE PAN ---------- */
+async function view_houses(){
+  var p=document.getElementById('page');
+  p.innerHTML='<div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-5 flex items-start gap-3">'+
+    '<div class="w-10 h-10 rounded-xl bg-amber-600 text-white flex items-center justify-center flex-shrink-0"><i data-lucide="wheat" class="w-5 h-5"></i></div>'+
+    '<p class="text-sm text-amber-900">Grupos pequeños que se reúnen en hogares. Un miembro puede pertenecer a varias.</p></div>'+
+    (puede(['pastor','lider','servidor'])?'<div class="mb-5"><button onclick="formCasa()" class="px-5 py-3 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl flex items-center gap-2"><i data-lucide="plus" class="w-5 h-5"></i>Nueva Casa de Pan</button></div>':'')+
+    '<div id="hGrid" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>';
+  ri(); await cat('members','select=id,nombre&order=nombre'); await pintarCasas();
+}
+async function pintarCasas(){
+  var hs=await dbGet('houses','select=*,members!houses_anfitrion_id_fkey(nombre)&order=nombre');
+  var rel=await dbGet('member_houses','select=house_id,members(nombre)');
+  limpiarCache('houses');
+  var g=document.getElementById('hGrid');
+  if(!hs.length){ g.innerHTML=vacio('wheat','Sin Casas de Pan registradas.'); ri(); return; }
+  g.innerHTML=hs.map(function(h){
+    var ints=rel.filter(function(r){return r.house_id===h.id;});
+    return '<div class="bg-white rounded-2xl border border-slate-200 p-5"><div class="flex items-start justify-between mb-3">'+
+      '<div class="flex items-center gap-2 flex-1 min-w-0"><div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0"><i data-lucide="wheat" class="w-5 h-5"></i></div>'+
+      '<div class="min-w-0"><h4 class="font-bold text-slate-800 truncate">'+esc(h.nombre)+'</h4>'+
+      (h.members?'<p class="text-xs text-slate-500 truncate">Anfitrión: '+esc(h.members.nombre)+'</p>':'<p class="text-xs text-slate-400">Sin anfitrión</p>')+'</div></div>'+
+      '<div class="flex gap-1 flex-shrink-0">'+(puede(['pastor','lider','servidor'])?'<button onclick="editarCasa(\''+h.id+'\')" class="p-1.5 hover:bg-slate-100 rounded-lg"><i data-lucide="pencil" class="w-4 h-4"></i></button>':'')+
+      (puede(['pastor'])?'<button onclick="borrarCasa(\''+h.id+'\',\''+esc(h.nombre).replace(/'/g,"")+'\')" class="p-1.5 text-red-600 hover:bg-red-100 rounded-lg"><i data-lucide="trash-2" class="w-4 h-4"></i></button>':'')+'</div></div>'+
+      '<div class="text-sm text-slate-600 space-y-1 mb-3">'+
+      (h.dia_reunion?'<div class="flex items-center gap-1.5"><i data-lucide="calendar" class="w-3.5 h-3.5 text-slate-400"></i><span class="capitalize">'+esc(h.dia_reunion)+'</span>'+(h.hora?' · '+esc(h.hora):'')+'</div>':'')+
+      (h.direccion?'<div class="flex items-center gap-1.5"><i data-lucide="map-pin" class="w-3.5 h-3.5 text-slate-400"></i>'+esc(h.direccion)+'</div>':'')+'</div>'+
+      '<div class="border-t border-slate-100 pt-3"><div class="text-xs font-semibold text-slate-500 mb-2 flex items-center gap-1.5"><i data-lucide="users" class="w-3.5 h-3.5"></i>'+ints.length+' integrante'+(ints.length!==1?'s':'')+'</div>'+
+      '<div class="flex flex-wrap gap-1">'+ints.slice(0,8).map(function(r){return '<span class="text-xs bg-amber-50 text-amber-800 px-2 py-0.5 rounded-md">'+esc(r.members?r.members.nombre:'?')+'</span>';}).join('')+
+      (ints.length>8?'<span class="text-xs text-slate-400">+'+(ints.length-8)+'</span>':'')+'</div></div></div>';
+  }).join('');
+  ri();
+}
+async function editarCasa(id){ var d=await dbGet('houses','id=eq.'+id+'&select=*'); formCasa(d[0]); }
+function formCasa(h){
+  h=h||{};
+  var mem=S.cache.members||[];
+  var dias=['lunes','martes','miercoles','jueves','viernes','sabado','domingo'];
+  modal('mH', mHead((h.id?'Editar':'Nueva')+' Casa de Pan','mH')+
+   '<form id="fH" class="p-4 space-y-3">'+
+   '<div><label class="text-sm font-medium">Nombre *</label><input name="nombre" required value="'+esc(h.nombre||'')+'" placeholder="Ej: Casa López Norte" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+   '<div><label class="text-sm font-medium">Anfitrión</label><select name="anfitrion_id" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"><option value="">Sin anfitrión</option>'+
+     mem.map(function(m){return '<option value="'+m.id+'"'+(h.anfitrion_id===m.id?' selected':'')+'>'+esc(m.nombre)+'</option>';}).join('')+'</select></div>'+
+   '<div><label class="text-sm font-medium">Dirección</label><input name="direccion" value="'+esc(h.direccion||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+   '<div class="grid grid-cols-2 gap-3">'+
+     '<div><label class="text-sm font-medium">Día</label><select name="dia_reunion" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"><option value="">—</option>'+
+       dias.map(function(d){return '<option value="'+d+'"'+(h.dia_reunion===d?' selected':'')+'>'+d+'</option>';}).join('')+'</select></div>'+
+     '<div><label class="text-sm font-medium">Hora</label><input name="hora" type="time" value="'+esc(h.hora||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+   '</div>'+
+   '<div><label class="text-sm font-medium">Descripción</label><textarea name="descripcion" rows="2" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg">'+esc(h.descripcion||'')+'</textarea></div>'+
+   mFoot('mH')+'</form>');
+  document.getElementById('fH').onsubmit=async function(e){
+    e.preventDefault();
+    try{
+      var fd=new FormData(e.target);
+      var b={nombre:fd.get('nombre'),anfitrion_id:fd.get('anfitrion_id')||null,direccion:fd.get('direccion')||null,dia_reunion:fd.get('dia_reunion')||null,hora:fd.get('hora')||null,descripcion:fd.get('descripcion')||null};
+      if(h.id) await dbPatch('houses','id=eq.'+h.id,b); else await dbPost('houses',b);
+      limpiarCache('houses'); toast('Guardado','success'); closeModal('mH'); pintarCasas();
+    }catch(err){ toast(err.message.slice(0,120),'error'); }
+  };
+}
+async function borrarCasa(id,n){ if(!confirm('¿Eliminar "'+n+'"?'))return; try{ await dbDel('houses','id=eq.'+id); limpiarCache('houses'); toast('Eliminada','success'); pintarCasas(); }catch(e){ toast(e.message.slice(0,120),'error'); } }
+
+/* ---------- MINISTERIOS ---------- */
+async function view_teams(){
+  var p=document.getElementById('page');
+  p.innerHTML=(puede(['pastor','lider'])?'<div class="mb-5"><button onclick="formEquipo()" class="px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl flex items-center gap-2"><i data-lucide="plus" class="w-5 h-5"></i>Nuevo ministerio</button></div>':'')+
+    '<div id="tGrid" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>';
+  ri(); await cat('members','select=id,nombre&order=nombre'); await pintarEquipos();
+}
+async function pintarEquipos(){
+  var ts=await dbGet('teams','select=*,members!teams_lider_fk(nombre)&order=nombre');
+  var rel=await dbGet('member_teams','select=team_id');
+  limpiarCache('teams');
+  var cnt={}; rel.forEach(function(r){ cnt[r.team_id]=(cnt[r.team_id]||0)+1; });
+  var g=document.getElementById('tGrid');
+  if(!ts.length){ g.innerHTML=vacio('target','Sin ministerios registrados.'); ri(); return; }
+  g.innerHTML=ts.map(function(t){
+    return '<div class="bg-white rounded-2xl border border-slate-200 p-5"><div class="flex items-start justify-between mb-3">'+
+      '<div class="flex items-center gap-2 flex-1 min-w-0"><div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center flex-shrink-0"><i data-lucide="target" class="w-5 h-5"></i></div>'+
+      '<h4 class="font-bold text-slate-800 truncate">'+esc(t.nombre)+'</h4></div>'+
+      '<div class="flex gap-1">'+(puede(['pastor','lider'])?'<button onclick="editarEquipo(\''+t.id+'\')" class="p-1.5 hover:bg-slate-100 rounded-lg"><i data-lucide="pencil" class="w-4 h-4"></i></button>':'')+
+      (puede(['pastor'])?'<button onclick="borrarEquipo(\''+t.id+'\',\''+esc(t.nombre).replace(/'/g,"")+'\')" class="p-1.5 text-red-600 hover:bg-red-100 rounded-lg"><i data-lucide="trash-2" class="w-4 h-4"></i></button>':'')+'</div></div>'+
+      (t.descripcion?'<p class="text-sm text-slate-500 mb-3 lc2">'+esc(t.descripcion)+'</p>':'')+
+      '<div class="text-sm space-y-1.5 border-t border-slate-100 pt-3">'+
+      '<div class="flex items-center gap-2"><i data-lucide="user-check" class="w-3.5 h-3.5 text-slate-400"></i><span class="text-slate-600">Líder:</span> <span class="font-medium">'+(t.members?esc(t.members.nombre):'<span class="text-slate-400">sin asignar</span>')+'</span></div>'+
+      '<div class="flex items-center gap-2"><i data-lucide="users" class="w-3.5 h-3.5 text-slate-400"></i><span class="text-slate-600">Integrantes:</span> <span class="font-medium">'+(cnt[t.id]||0)+'</span></div>'+
+      '</div></div>';
+  }).join('');
+  ri();
+}
+async function editarEquipo(id){ var d=await dbGet('teams','id=eq.'+id+'&select=*'); formEquipo(d[0]); }
+function formEquipo(t){
+  t=t||{}; var mem=S.cache.members||[];
+  modal('mT', mHead((t.id?'Editar':'Nuevo')+' ministerio','mT')+
+   '<form id="fT" class="p-4 space-y-3">'+
+   '<div><label class="text-sm font-medium">Nombre *</label><input name="nombre" required value="'+esc(t.nombre||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+   '<div><label class="text-sm font-medium">Descripción</label><textarea name="descripcion" rows="2" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg">'+esc(t.descripcion||'')+'</textarea></div>'+
+   '<div><label class="text-sm font-medium">Líder</label><select name="lider_id" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"><option value="">Sin líder</option>'+
+     mem.map(function(m){return '<option value="'+m.id+'"'+(t.lider_id===m.id?' selected':'')+'>'+esc(m.nombre)+'</option>';}).join('')+'</select></div>'+
+   mFoot('mT')+'</form>');
+  document.getElementById('fT').onsubmit=async function(e){
+    e.preventDefault();
+    try{
+      var fd=new FormData(e.target);
+      var b={nombre:fd.get('nombre'),descripcion:fd.get('descripcion')||null,lider_id:fd.get('lider_id')||null};
+      if(t.id) await dbPatch('teams','id=eq.'+t.id,b); else await dbPost('teams',b);
+      limpiarCache('teams'); toast('Guardado','success'); closeModal('mT'); pintarEquipos();
+    }catch(err){ toast(err.message.slice(0,120),'error'); }
+  };
+}
+async function borrarEquipo(id,n){ if(!confirm('¿Eliminar "'+n+'"?'))return; try{ await dbDel('teams','id=eq.'+id); limpiarCache('teams'); toast('Eliminado','success'); pintarEquipos(); }catch(e){ toast(e.message.slice(0,120),'error'); } }
+
+/* ---------- ASISTENCIA ---------- */
+var A = { servicio:null, miembros:[], mapa:{} };
+async function view_attendance(){
+  var p=document.getElementById('page');
+  p.innerHTML=
+   '<div class="bg-white rounded-2xl border border-slate-200 p-4 mb-4">'+
+     '<label class="text-sm font-medium text-slate-600 flex items-center gap-1.5 mb-1.5"><i data-lucide="calendar" class="w-4 h-4"></i>Fecha</label>'+
+     '<input id="aFecha" type="date" value="'+hoy()+'" class="w-full sm:w-64 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+   '<div id="aServicios" class="mb-4"></div>'+
+   '<div id="aPanel" class="hidden">'+
+     '<div id="aReporte" class="mb-4"></div>'+
+     '<div class="bg-white rounded-2xl border border-slate-200 p-4 mb-4 grid grid-cols-1 sm:grid-cols-3 gap-3">'+
+       '<div><label class="text-xs font-medium text-slate-600">Buscar nombre</label><input id="aBuscar" placeholder="Nombre..." class="w-full px-3 py-2.5 border border-slate-300 rounded-lg mt-1"></div>'+
+       '<div><label class="text-xs font-medium text-slate-600">Familia</label><select id="aFam" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg mt-1"><option value="">Todas</option></select></div>'+
+       '<div><label class="text-xs font-medium text-slate-600">Casa de Pan</label><select id="aCasa" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg mt-1"><option value="">Todas</option></select></div>'+
+     '</div>'+
+     '<div class="flex gap-2 mb-4 flex-wrap">'+
+       '<button onclick="marcarTodos(true)" class="px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 rounded-lg text-sm font-medium flex items-center gap-1.5"><i data-lucide="check" class="w-4 h-4"></i>Marcar todos</button>'+
+       '<button onclick="marcarTodos(false)" class="px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-sm font-medium flex items-center gap-1.5"><i data-lucide="x" class="w-4 h-4"></i>Desmarcar</button>'+
+     '</div>'+
+     '<div id="aLista" class="space-y-2"></div>'+
+   '</div>';
+  ri();
+
+  var fams=await cat('families','select=*&order=nombre_familia');
+  var casas=await cat('houses','select=*&order=nombre');
+  fams.forEach(function(f){ document.getElementById('aFam').innerHTML+='<option value="'+f.id+'">'+esc(f.nombre_familia)+'</option>'; });
+  casas.forEach(function(c){ document.getElementById('aCasa').innerHTML+='<option value="'+c.id+'">'+esc(c.nombre)+'</option>'; });
+
+  A.miembros = await dbGet('members','select=id,nombre,foto_url,familia_id,families(nombre_familia),member_houses(house_id)&estado_espiritual=neq.inactivo&order=nombre');
+
+  document.getElementById('aFecha').onchange=cargarServiciosDia;
+  document.getElementById('aBuscar').oninput=pintarAsistencia;
+  document.getElementById('aFam').onchange=pintarAsistencia;
+  document.getElementById('aCasa').onchange=pintarAsistencia;
+  await cargarServiciosDia();
+}
+
+async function cargarServiciosDia(){
+  var f=document.getElementById('aFecha').value;
+  var c=document.getElementById('aServicios');
+  if(!f){ c.innerHTML=''; return; }
+  var sv=await dbGet('service_plans','fecha=eq.'+f+'&select=*,meeting_types(nombre,icono)&order=created_at');
+  if(!sv.length){
+    c.innerHTML='<div class="bg-amber-50 border border-amber-200 rounded-2xl p-5 text-center">'+
+      '<i data-lucide="calendar-off" class="w-10 h-10 mx-auto text-amber-500 mb-2"></i>'+
+      '<p class="text-amber-900 mb-3">No hay servicios planificados para esta fecha.</p>'+
+      '<button onclick="ir(\'services\')" class="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-semibold"><i data-lucide="plus" class="w-4 h-4"></i>Crear servicio</button></div>';
+    document.getElementById('aPanel').classList.add('hidden'); A.servicio=null; ri(); return;
+  }
+  c.innerHTML='<div class="bg-white rounded-2xl border border-slate-200 p-4">'+
+    '<div class="text-sm font-medium text-slate-600 mb-3">'+(sv.length===1?'Servicio del día:':sv.length+' servicios — selecciona cuál registrar:')+'</div>'+
+    '<div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">'+sv.map(function(s){
+      var act=A.servicio&&A.servicio.id===s.id;
+      return '<button onclick="elegirServicio(\''+s.id+'\')" class="text-left p-3 rounded-xl border-2 transition active:scale-[.98] '+(act?'border-indigo-600 bg-indigo-50':'border-slate-200 bg-white hover:border-indigo-300')+'">'+
+        '<div class="flex items-center gap-2"><div class="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center text-xl flex-shrink-0">'+esc(s.meeting_types?s.meeting_types.icono:'⛪')+'</div>'+
+        '<div class="flex-1 min-w-0"><div class="font-bold truncate">'+esc(s.meeting_types?s.meeting_types.nombre:s.tipo_reunion)+'</div>'+
+        (s.tema?'<div class="text-xs text-slate-500 truncate">'+esc(s.tema)+'</div>':'')+'</div>'+
+        (act?'<i data-lucide="check-circle-2" class="w-5 h-5 text-indigo-600"></i>':'')+'</div></button>';
+    }).join('')+'</div>'+
+    '<p class="text-xs text-slate-500 mt-3 flex items-start gap-1"><i data-lucide="info" class="w-3.5 h-3.5 mt-0.5 flex-shrink-0"></i>Un miembro puede asistir a varios servicios el mismo día.</p></div>';
+  ri();
+  if(sv.length===1 && !A.servicio) elegirServicio(sv[0].id, sv);
+  else if(A.servicio){ var u=sv.filter(function(s){return s.id===A.servicio.id;})[0]; if(u) elegirServicio(u.id, sv); else { A.servicio=null; document.getElementById('aPanel').classList.add('hidden'); } }
+}
+
+async function elegirServicio(id, lista){
+  if(lista) A.servicio=lista.filter(function(s){return s.id===id;})[0];
+  else A.servicio=(await dbGet('service_plans','id=eq.'+id+'&select=*,meeting_types(nombre,icono)'))[0];
+  await cargarServiciosDia();
+  var att=await dbGet('attendance','fecha=eq.'+A.servicio.fecha+'&meeting_type_id=eq.'+A.servicio.meeting_type_id+'&select=*');
+  A.mapa={}; att.forEach(function(a){ A.mapa[a.member_id]=a; });
+  document.getElementById('aPanel').classList.remove('hidden');
+  pintarAsistencia();
+}
+
+function filtrarMiembros(){
+  var q=(document.getElementById('aBuscar').value||'').trim().toLowerCase();
+  var fam=document.getElementById('aFam').value, cas=document.getElementById('aCasa').value;
+  var l=A.miembros;
+  if(q) l=l.filter(function(m){return (m.nombre||'').toLowerCase().indexOf(q)!==-1;});
+  if(fam) l=l.filter(function(m){return m.familia_id===fam;});
+  if(cas) l=l.filter(function(m){return (m.member_houses||[]).some(function(h){return h.house_id===cas;});});
+  return l;
+}
+
+function pintarAsistencia(){
+  if(!A.servicio) return;
+  var fl=filtrarMiembros(), tot=A.miembros.length;
+  var pres=0; for(var k in A.mapa){ if(A.mapa[k].asistio) pres++; }
+  var mt=A.servicio.meeting_types;
+  document.getElementById('aReporte').innerHTML=
+    '<div class="bg-gradient-to-r from-indigo-600 to-violet-700 text-white rounded-2xl p-4 mb-3">'+
+    '<div class="text-xs opacity-80 uppercase tracking-wide">Registrando asistencia</div>'+
+    '<div class="text-lg font-bold">'+esc(mt?mt.icono:'⛪')+' '+esc(mt?mt.nombre:A.servicio.tipo_reunion)+'</div>'+
+    (A.servicio.tema?'<div class="text-sm opacity-90 mt-1">'+esc(A.servicio.tema)+'</div>':'')+'</div>'+
+    '<div class="bg-white border border-slate-200 rounded-2xl p-4 grid grid-cols-2 sm:grid-cols-4 gap-3">'+
+    '<div><div class="text-xs text-slate-500">Total</div><div class="text-xl font-bold">'+tot+'</div></div>'+
+    '<div><div class="text-xs text-slate-500">Presentes</div><div class="text-xl font-bold text-emerald-600">'+pres+'</div></div>'+
+    '<div><div class="text-xs text-slate-500">Ausentes</div><div class="text-xl font-bold text-red-600">'+(tot-pres)+'</div></div>'+
+    '<div><div class="text-xs text-slate-500">% Asist.</div><div class="text-xl font-bold text-indigo-600">'+(tot?Math.round(pres/tot*100):0)+'%</div></div></div>';
+  var L=document.getElementById('aLista');
+  if(!fl.length){ L.innerHTML='<p class="text-slate-400 text-center py-6">Sin miembros que coincidan.</p>'; return; }
+  L.innerHTML='<div class="text-xs text-slate-500 mb-2">Mostrando '+fl.length+' de '+tot+'</div>'+
+    fl.map(function(m){
+      var a=A.mapa[m.id], ok=a?a.asistio:false;
+      return '<label class="bg-white rounded-xl border p-3 flex items-center gap-3 cursor-pointer hover:bg-slate-50 transition '+(ok?'border-emerald-300 bg-emerald-50':'border-slate-200')+'">'+
+        '<div class="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold overflow-hidden flex-shrink-0">'+
+        (m.foto_url?'<img src="'+esc(m.foto_url)+'" class="w-full h-full object-cover">':esc(m.nombre[0].toUpperCase()))+'</div>'+
+        '<div class="flex-1 min-w-0"><div class="font-medium text-slate-800 truncate">'+esc(m.nombre)+'</div>'+
+        (m.families?'<div class="text-xs text-slate-500 truncate">'+esc(m.families.nombre_familia)+'</div>':'')+'</div>'+
+        '<input type="checkbox" '+(ok?'checked':'')+' onchange="marcarUno(\''+m.id+'\',this.checked)" class="w-6 h-6 accent-emerald-600 flex-shrink-0"></label>';
+    }).join('');
+  ri();
+}
+
+async function marcarUno(mid, ok){
+  if(!A.servicio) return;
+  var row={ member_id:mid, fecha:A.servicio.fecha, meeting_type_id:A.servicio.meeting_type_id, tipo_reunion:A.servicio.tipo_reunion, asistio:ok };
+  try{
+    await dbUpsert('attendance',[row],'member_id,fecha,tipo_reunion');
+    A.mapa[mid]=row; pintarAsistencia();
+  }catch(e){ toast(e.message.slice(0,120),'error'); }
+}
+async function marcarTodos(ok){
+  if(!A.servicio) return;
+  var vis=filtrarMiembros();
+  if(!vis.length) return;
+  if(!confirm('¿'+(ok?'Marcar':'Desmarcar')+' asistencia de '+vis.length+' miembros?')) return;
+  var rows=vis.map(function(m){ return { member_id:m.id, fecha:A.servicio.fecha, meeting_type_id:A.servicio.meeting_type_id, tipo_reunion:A.servicio.tipo_reunion, asistio:ok }; });
+  try{
+    await dbUpsert('attendance',rows,'member_id,fecha,tipo_reunion');
+    rows.forEach(function(r){ A.mapa[r.member_id]=r; });
+    toast(rows.length+' actualizados','success'); pintarAsistencia();
+  }catch(e){ toast(e.message.slice(0,150),'error'); }
+}
+
+/* ---------- SERVICIOS ---------- */
+async function view_services(){
+  var p=document.getElementById('page');
+  p.innerHTML='<div class="flex flex-wrap gap-2 mb-5 np">'+
+    (puede(['pastor','lider'])?'<button onclick="formPlan()" class="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl flex items-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i>Planificar servicio</button>':'')+
+    (puede(['pastor','lider'])?'<button onclick="gestionTipos()" class="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 rounded-xl font-semibold flex items-center gap-2"><i data-lucide="settings" class="w-4 h-4"></i>Tipos de reunión</button>':'')+
+    '</div><div id="sLista" class="space-y-4"></div>';
+  ri();
+  await cat('members','select=id,nombre&order=nombre');
+  await cat('meeting_types','select=*&activo=is.true&order=orden');
+  await pintarPlanes();
+}
+async function pintarPlanes(){
+  var pl=await dbGet('service_plans','select=*,meeting_types(codigo,nombre,icono)&order=fecha.desc&limit=20');
+  var L=document.getElementById('sLista');
+  if(!pl.length){ L.innerHTML=vacio('calendar-days','Sin servicios planificados.'); ri(); return; }
+  var tasks=await dbGet('service_tasks','select=*,members(nombre)&order=created_at');
+  L.innerHTML=pl.map(function(p){
+    var mine=tasks.filter(function(t){return t.service_plan_id===p.id;});
+    var pend=mine.filter(function(t){return t.estado==='pendiente';});
+    var proc=mine.filter(function(t){return t.estado==='en_proceso';});
+    var comp=mine.filter(function(t){return t.estado==='completado';});
+    var mt=p.meeting_types;
+    function col(tit,color,ic,items){
+      return '<div class="flex-1 min-w-[210px]"><div class="font-semibold text-'+color+'-700 mb-2 flex items-center gap-1.5 text-sm"><i data-lucide="'+ic+'" class="w-4 h-4"></i>'+tit+' ('+items.length+')</div><div class="space-y-2">'+
+        (items.length?items.map(function(t){
+          return '<div class="bg-white border border-'+color+'-200 rounded-xl p-3 text-sm"><div class="font-medium">'+esc(t.nombre_tarea)+'</div>'+
+            '<div class="text-xs text-slate-500 flex items-center gap-1 mt-0.5"><i data-lucide="user" class="w-3 h-3"></i>'+esc(t.members?t.members.nombre:'Sin asignar')+'</div>'+
+            '<div class="flex gap-1 mt-2 np">'+
+            (t.estado!=='pendiente'?'<button onclick="estadoTarea(\''+t.id+'\',\'pendiente\')" class="text-xs px-2 py-1 bg-slate-100 rounded"><i data-lucide="pause" class="w-3 h-3"></i></button>':'')+
+            (t.estado!=='en_proceso'?'<button onclick="estadoTarea(\''+t.id+'\',\'en_proceso\')" class="text-xs px-2 py-1 bg-amber-100 rounded"><i data-lucide="play" class="w-3 h-3"></i></button>':'')+
+            (t.estado!=='completado'?'<button onclick="estadoTarea(\''+t.id+'\',\'completado\')" class="text-xs px-2 py-1 bg-emerald-100 rounded"><i data-lucide="check" class="w-3 h-3"></i></button>':'')+
+            '<button onclick="borrarTarea(\''+t.id+'\')" class="text-xs px-2 py-1 bg-red-100 rounded ml-auto"><i data-lucide="trash-2" class="w-3 h-3"></i></button>'+
+            '</div></div>';
+        }).join(''):'<p class="text-xs text-slate-400 italic">Vacío</p>')+'</div></div>';
+    }
+    return '<div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5">'+
+      '<div class="flex items-start justify-between mb-4 flex-wrap gap-2">'+
+      '<div class="min-w-0 flex-1"><h4 class="text-base sm:text-lg font-bold text-slate-800">'+esc(mt?mt.icono:'⛪')+' '+fecha(p.fecha)+' · '+esc(mt?mt.nombre:p.tipo_reunion)+'</h4>'+
+      (p.tema?'<p class="text-sm text-slate-500 mt-0.5">'+esc(p.tema)+'</p>':'')+
+      (p.predicador?'<p class="text-sm text-slate-500">'+esc(p.predicador)+'</p>':'')+'</div>'+
+      '<div class="flex gap-1 np">'+
+      '<button onclick="compartirPlan(\''+p.id+'\')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium flex items-center gap-1"><i data-lucide="share-2" class="w-3.5 h-3.5"></i><span class="hidden sm:inline">Compartir</span></button>'+
+      (puede(['pastor','lider','servidor'])?'<button onclick="formTarea(\''+p.id+'\')" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-sm rounded-lg font-medium flex items-center gap-1"><i data-lucide="plus" class="w-3.5 h-3.5"></i><span class="hidden sm:inline">Tarea</span></button>':'')+
+      (puede(['pastor'])?'<button onclick="borrarPlan(\''+p.id+'\')" class="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 text-sm rounded-lg"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>':'')+
+      '</div></div>'+
+      '<div class="flex gap-3 overflow-x-auto pb-2">'+col('Pendiente','slate','clock',pend)+col('En proceso','amber','loader',proc)+col('Completado','emerald','check-circle-2',comp)+'</div></div>';
+  }).join('');
+  ri();
+}
+function formPlan(){
+  var tipos=S.cache.meeting_types||[];
+  modal('mS', mHead('Nuevo plan de servicio','mS')+
+   '<form id="fS" class="p-4 space-y-3">'+
+   '<div><label class="text-sm font-medium">Fecha *</label><input name="fecha" type="date" required value="'+hoy()+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+   '<div><label class="text-sm font-medium">Tipo de reunión *</label><select name="meeting_type_id" required class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg">'+
+     tipos.map(function(t){return '<option value="'+t.id+'">'+esc(t.icono+' '+t.nombre)+'</option>';}).join('')+'</select></div>'+
+   '<div><label class="text-sm font-medium">Tema</label><input name="tema" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+   '<div><label class="text-sm font-medium">Predicador / Ministrante</label><input name="predicador" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+   mFoot('mS','Crear')+'</form>');
+  document.getElementById('fS').onsubmit=async function(e){
+    e.preventDefault();
+    try{
+      var fd=new FormData(e.target);
+      var tid=fd.get('meeting_type_id');
+      var t=(S.cache.meeting_types||[]).filter(function(x){return x.id===tid;})[0];
+      await dbPost('service_plans',{ fecha:fd.get('fecha'), meeting_type_id:tid, tipo_reunion:t?t.codigo:'especial', tema:fd.get('tema')||null, predicador:fd.get('predicador')||null });
+      toast('Plan creado','success'); closeModal('mS'); pintarPlanes();
+    }catch(err){ toast(err.message.slice(0,120),'error'); }
+  };
+}
+function formTarea(planId){
+  var mem=S.cache.members||[];
+  modal('mTa', mHead('Nueva tarea','mTa')+
+   '<form id="fTa" class="p-4 space-y-3">'+
+   '<div><label class="text-sm font-medium">Tarea *</label><input name="nombre_tarea" required list="sug" placeholder="Ej: Abrir iglesia, alabanza..." class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg">'+
+   '<datalist id="sug"><option>Abrir iglesia</option><option>Aseo del templo</option><option>Alabanza</option><option>Sonido</option><option>Proyección</option><option>Ujieres</option><option>Ofrenda</option><option>Predicación</option><option>Oración de apertura</option><option>Cierre</option></datalist></div>'+
+   '<div><label class="text-sm font-medium">Responsable</label><select name="responsable_id" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"><option value="">Sin responsable</option>'+
+     mem.map(function(m){return '<option value="'+m.id+'">'+esc(m.nombre)+'</option>';}).join('')+'</select></div>'+
+   mFoot('mTa','Agregar')+'</form>');
+  document.getElementById('fTa').onsubmit=async function(e){
+    e.preventDefault();
+    try{
+      var fd=new FormData(e.target);
+      await dbPost('service_tasks',{ service_plan_id:planId, nombre_tarea:fd.get('nombre_tarea'), responsable_id:fd.get('responsable_id')||null });
+      toast('Tarea agregada','success'); closeModal('mTa'); pintarPlanes();
+    }catch(err){ toast(err.message.slice(0,120),'error'); }
+  };
+}
+async function estadoTarea(id,est){ try{ await dbPatch('service_tasks','id=eq.'+id,{estado:est}); pintarPlanes(); }catch(e){ toast(e.message.slice(0,120),'error'); } }
+async function borrarTarea(id){ if(!confirm('¿Eliminar tarea?'))return; try{ await dbDel('service_tasks','id=eq.'+id); pintarPlanes(); }catch(e){ toast(e.message.slice(0,120),'error'); } }
+async function borrarPlan(id){ if(!confirm('¿Eliminar el plan y sus tareas?'))return; try{ await dbDel('service_plans','id=eq.'+id); toast('Eliminado','success'); pintarPlanes(); }catch(e){ toast(e.message.slice(0,120),'error'); } }
+
+async function compartirPlan(id){
+  try{
+    var p=(await dbGet('service_plans','id=eq.'+id+'&select=*,meeting_types(nombre,icono)'))[0];
+    var ts=await dbGet('service_tasks','service_plan_id=eq.'+id+'&select=*,members(nombre)&order=created_at');
+    var f=new Date(p.fecha+'T12:00:00').toLocaleDateString('es-HN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    var mt=p.meeting_types;
+    var filas = ts.length ? ts.map(function(t){
+      return '<div class="bg-white/10 rounded-xl p-3 flex items-center justify-between gap-2"><div class="min-w-0"><div class="font-semibold text-white text-sm">'+esc(t.nombre_tarea)+'</div>'+
+        '<div class="text-xs text-white/80">'+esc(t.members?t.members.nombre:'Sin asignar')+'</div></div>'+
+        '<div class="text-lg">'+(t.estado==='completado'?'✓':(t.estado==='en_proceso'?'◐':'○'))+'</div></div>';
+    }).join('') : '<p class="text-white/80 text-center italic text-sm">Sin tareas asignadas</p>';
+
+    window._compartir = { fecha:f, tipo:(mt?mt.nombre:p.tipo_reunion), tema:p.tema, pred:p.predicador,
+      tareas: ts.map(function(t){ return { n:t.nombre_tarea, r:(t.members?t.members.nombre:null) }; }) };
+
+    modal('mC','<div id="flyer" class="flyer text-white p-6 sm:p-8">'+
+      '<div class="text-center mb-4"><div class="text-xs uppercase tracking-widest opacity-80 mb-1">Iglesia ADULAM</div>'+
+      '<div class="text-4xl mb-2">'+esc(mt?mt.icono:'⛪')+'</div>'+
+      '<h2 class="text-2xl sm:text-3xl font-bold leading-tight">'+esc(mt?mt.nombre:p.tipo_reunion)+'</h2>'+
+      '<p class="text-base mt-1 capitalize">'+esc(f)+'</p></div>'+
+      (p.tema?'<div class="bg-white/15 rounded-xl p-3 text-center mb-4"><div class="text-xs uppercase opacity-80">Tema</div><div class="text-lg font-semibold">'+esc(p.tema)+'</div></div>':'')+
+      (p.predicador?'<div class="text-center mb-4"><div class="text-xs uppercase opacity-80">Ministra</div><div class="text-base font-semibold">'+esc(p.predicador)+'</div></div>':'')+
+      '<div class="border-t border-white/20 pt-4"><div class="text-xs uppercase tracking-wider opacity-80 mb-3 text-center">Organización</div>'+
+      '<div class="space-y-2">'+filas+'</div></div>'+
+      '<div class="text-center mt-5 text-xs opacity-70">Compartido desde ADULAM</div></div>'+
+      '<div class="p-4 flex flex-col sm:flex-row gap-2 bg-slate-100 np">'+
+      '<button onclick="descargarFlyer()" class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2"><i data-lucide="download" class="w-4 h-4"></i>Descargar imagen</button>'+
+      '<button onclick="copiarTextoPlan()" class="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2"><i data-lucide="clipboard" class="w-4 h-4"></i>Copiar texto</button>'+
+      '<button onclick="closeModal(\'mC\')" class="py-3 px-6 bg-slate-300 rounded-xl">Cerrar</button></div>');
+  }catch(e){ toast(e.message.slice(0,120),'error'); }
+}
+function copiarTextoPlan(){
+  var d=window._compartir; if(!d) return;
+  var t='*IGLESIA ADULAM*\n\n'+d.fecha+'\n'+d.tipo+'\n';
+  if(d.tema) t+='\nTema: *'+d.tema+'*\n';
+  if(d.pred) t+='Ministra: '+d.pred+'\n';
+  t+='\n*Organización del servicio:*\n';
+  d.tareas.forEach(function(x){ t+='• '+x.n+': '+(x.r||'sin asignar')+'\n'; });
+  t+='\n_Bendiciones. ¡Te esperamos!_';
+  if(navigator.clipboard) navigator.clipboard.writeText(t).then(function(){ toast('Texto copiado','success'); }).catch(function(){ prompt('Copia manualmente:',t); });
+  else prompt('Copia manualmente:',t);
+}
+async function descargarFlyer(){
+  toast('Generando imagen...','info');
+  try{
+    if(!window.html2canvas){
+      await new Promise(function(res,rej){ var s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js'; s.onload=res; s.onerror=rej; document.head.appendChild(s); });
+    }
+    var el=document.getElementById('flyer');
+    var cv=await html2canvas(el,{scale:2,backgroundColor:null,useCORS:true});
+    cv.toBlob(function(b){ var u=URL.createObjectURL(b); var a=document.createElement('a'); a.href=u; a.download='servicio-adulam-'+hoy()+'.png'; a.click(); URL.revokeObjectURL(u); toast('Imagen descargada','success'); });
+  }catch(e){ toast('No se pudo generar: '+e.message.slice(0,80),'error'); }
+}
+async function gestionTipos(){
+  var ts=await dbGet('meeting_types','select=*&order=orden');
+  modal('mTi', mHead('Tipos de reunión','mTi')+'<div class="p-4">'+
+    '<div class="bg-slate-50 rounded-xl mb-4 overflow-hidden">'+ts.map(function(t){
+      return '<div class="flex items-center gap-2 p-3 border-b border-slate-100 last:border-0"><span class="text-xl">'+esc(t.icono)+'</span>'+
+        '<div class="flex-1 min-w-0"><div class="font-medium text-sm">'+esc(t.nombre)+'</div><div class="text-xs text-slate-400">'+esc(t.codigo)+'</div></div>'+
+        '<button onclick="borrarTipo(\''+t.id+'\',\''+esc(t.nombre).replace(/'/g,"")+'\')" class="p-1.5 text-red-600 hover:bg-red-100 rounded"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div>';
+    }).join('')+'</div>'+
+    '<form id="fTi" class="space-y-2 border-t border-slate-200 pt-4"><h4 class="font-semibold text-sm">Agregar tipo</h4>'+
+    '<div class="grid grid-cols-4 gap-2"><input name="icono" placeholder="🎉" maxlength="3" class="px-3 py-2.5 border border-slate-300 rounded-lg text-center text-xl">'+
+    '<input name="nombre" required placeholder="Vigilia" class="col-span-3 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+    '<input name="codigo" required placeholder="codigo_unico" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm">'+
+    '<button type="submit" class="w-full py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-semibold">Agregar tipo</button></form></div>');
+  document.getElementById('fTi').onsubmit=async function(e){
+    e.preventDefault();
+    try{
+      var fd=new FormData(e.target);
+      var cod=(fd.get('codigo')||'').toLowerCase().replace(/[^a-z0-9_]/g,'_');
+      await dbPost('meeting_types',{ codigo:cod, nombre:fd.get('nombre'), icono:fd.get('icono')||'⛪', orden:99 });
+      limpiarCache('meeting_types'); await cat('meeting_types','select=*&activo=is.true&order=orden');
+      toast('Tipo agregado','success'); gestionTipos();
+    }catch(err){ toast(err.message.slice(0,120),'error'); }
+  };
+}
+async function borrarTipo(id,n){ if(!confirm('¿Eliminar el tipo "'+n+'"?'))return; try{ await dbDel('meeting_types','id=eq.'+id); limpiarCache('meeting_types'); toast('Eliminado','success'); gestionTipos(); }catch(e){ toast(e.message.slice(0,120),'error'); } }
+
+/* ---------- TESORERÍA ---------- */
+async function view_treasury(){
+  if(!puede(['pastor','lider'])){ document.getElementById('page').innerHTML=vacio('lock','Solo pastor y líder pueden ver la tesorería.'); ri(); return; }
+  var p=document.getElementById('page');
+  p.innerHTML='<div id="tBal" class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5"></div>'+
+    '<div class="flex flex-col sm:flex-row gap-3 mb-4">'+
+    '<input id="tMes" type="month" value="'+new Date().toISOString().slice(0,7)+'" class="px-3 py-2.5 border border-slate-300 rounded-lg">'+
+    '<button onclick="pintarTesoreria()" class="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 rounded-lg font-medium flex items-center justify-center gap-2"><i data-lucide="filter" class="w-4 h-4"></i>Filtrar</button>'+
+    (puede(['pastor'])?'<button onclick="formMovimiento()" class="sm:ml-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl flex items-center justify-center gap-2"><i data-lucide="plus" class="w-5 h-5"></i>Registrar movimiento</button>':'')+
+    '</div><div id="tMovs"></div>';
+  ri(); await pintarTesoreria();
+}
+async function pintarTesoreria(){
+  var mes=document.getElementById('tMes').value;
+  var pr=mes.split('-'), a=parseInt(pr[0]), m=parseInt(pr[1]);
+  var ini=mes+'-01', fin=new Date(a,m,0).toISOString().slice(0,10);
+  var d=await dbGet('treasury','fecha=gte.'+ini+'&fecha=lte.'+fin+'&select=*&order=fecha.desc');
+  var ing=0,egr=0; d.forEach(function(r){ if(r.tipo==='ingreso') ing+=Number(r.monto); else egr+=Number(r.monto); });
+  document.getElementById('tBal').innerHTML=
+    '<div class="bg-white rounded-2xl border border-emerald-200 p-4"><div class="flex items-center gap-2 text-sm text-slate-500 mb-1"><i data-lucide="trending-up" class="w-4 h-4 text-emerald-600"></i>Ingresos</div><div class="text-xl sm:text-2xl font-bold text-emerald-600">'+dinero(ing)+'</div></div>'+
+    '<div class="bg-white rounded-2xl border border-red-200 p-4"><div class="flex items-center gap-2 text-sm text-slate-500 mb-1"><i data-lucide="trending-down" class="w-4 h-4 text-red-600"></i>Egresos</div><div class="text-xl sm:text-2xl font-bold text-red-600">'+dinero(egr)+'</div></div>'+
+    '<div class="bg-gradient-to-br from-indigo-50 to-violet-50 rounded-2xl border border-indigo-200 p-4"><div class="flex items-center gap-2 text-sm text-slate-500 mb-1"><i data-lucide="wallet" class="w-4 h-4 text-indigo-600"></i>Balance</div><div class="text-xl sm:text-2xl font-bold '+((ing-egr)>=0?'text-indigo-700':'text-red-700')+'">'+dinero(ing-egr)+'</div></div>';
+  var c=document.getElementById('tMovs');
+  if(!d.length){ c.innerHTML='<div class="bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-400"><i data-lucide="receipt" class="w-12 h-12 mx-auto mb-3 opacity-40"></i><p>Sin movimientos este mes.</p></div>'; ri(); return; }
+  c.innerHTML='<div class="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">'+d.map(function(r){
+    return '<div class="p-4 flex items-start gap-3"><div class="w-10 h-10 rounded-xl '+(r.tipo==='ingreso'?'bg-emerald-100 text-emerald-700':'bg-red-100 text-red-700')+' flex items-center justify-center flex-shrink-0">'+
+      '<i data-lucide="'+(r.tipo==='ingreso'?'arrow-down-to-line':'arrow-up-from-line')+'" class="w-5 h-5"></i></div>'+
+      '<div class="flex-1 min-w-0"><div class="flex items-start justify-between gap-2">'+
+      '<div><div class="font-semibold capitalize">'+esc(r.categoria)+'</div><div class="text-xs text-slate-500">'+fecha(r.fecha)+'</div></div>'+
+      '<div class="text-right"><div class="font-bold '+(r.tipo==='ingreso'?'text-emerald-700':'text-red-700')+'">'+(r.tipo==='ingreso'?'+':'-')+dinero(r.monto)+'</div>'+
+      (puede(['pastor'])?'<button onclick="borrarMovimiento(\''+r.id+'\')" class="text-red-600 text-xs mt-1 p-1 hover:bg-red-50 rounded inline-flex"><i data-lucide="trash-2" class="w-3 h-3"></i></button>':'')+'</div></div>'+
+      (r.descripcion?'<div class="text-sm text-slate-600 mt-1">'+esc(r.descripcion)+'</div>':'')+'</div></div>';
+  }).join('')+'</div>';
+  ri();
+}
+function formMovimiento(){
+  modal('mMv', mHead('Nuevo movimiento','mMv')+
+   '<form id="fMv" class="p-4 space-y-3">'+
+   '<div><label class="text-sm font-medium">Tipo</label><select name="tipo" required class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"><option value="ingreso">Ingreso</option><option value="egreso">Egreso</option></select></div>'+
+   '<div><label class="text-sm font-medium">Categoría</label><input name="categoria" required list="cats" placeholder="diezmo, ofrenda, gasto..." class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg">'+
+   '<datalist id="cats"><option>diezmo</option><option>ofrenda</option><option>gasto</option><option>servicios</option><option>misión</option><option>mantenimiento</option></datalist></div>'+
+   '<div><label class="text-sm font-medium">Monto</label><input name="monto" type="number" step="0.01" min="0" required inputmode="decimal" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+   '<div><label class="text-sm font-medium">Fecha</label><input name="fecha" type="date" required value="'+hoy()+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+   '<div><label class="text-sm font-medium">Descripción</label><textarea name="descripcion" rows="2" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></textarea></div>'+
+   mFoot('mMv')+'</form>');
+  document.getElementById('fMv').onsubmit=async function(e){
+    e.preventDefault();
+    try{
+      var fd=new FormData(e.target);
+      await dbPost('treasury',{ tipo:fd.get('tipo'), categoria:(fd.get('categoria')||'').toLowerCase(), monto:parseFloat(fd.get('monto')), fecha:fd.get('fecha'), descripcion:fd.get('descripcion')||null, registrado_por:S.user.id });
+      toast('Registrado','success'); closeModal('mMv'); pintarTesoreria();
+    }catch(err){ toast(err.message.slice(0,120),'error'); }
+  };
+}
+async function borrarMovimiento(id){ if(!confirm('¿Eliminar este movimiento?'))return; try{ await dbDel('treasury','id=eq.'+id); toast('Eliminado','success'); pintarTesoreria(); }catch(e){ toast(e.message.slice(0,120),'error'); } }
+
+/* ---------- DISCIPULADO ---------- */
+var COLS={indigo:['bg-indigo-50','border-indigo-200','text-indigo-700','bg-indigo-600'],emerald:['bg-emerald-50','border-emerald-200','text-emerald-700','bg-emerald-600'],amber:['bg-amber-50','border-amber-200','text-amber-700','bg-amber-600'],violet:['bg-violet-50','border-violet-200','text-violet-700','bg-violet-600'],rose:['bg-rose-50','border-rose-200','text-rose-700','bg-rose-600']};
+function cc(c){ return COLS[c]||COLS.indigo; }
+
+async function view_discipleship(){ await verCursos(); }
+
+async function verCursos(){
+  var cur=await dbGet('discipleship_courses','select=*&order=orden');
+  var lec=await dbGet('discipleship_lessons','select=course_id');
+  var coh=await dbGet('discipleship_cohorts','select=course_id');
+  var p=document.getElementById('page');
+  p.innerHTML='<div class="mb-5 flex flex-wrap justify-between items-center gap-3">'+
+    '<div><h3 class="text-lg sm:text-xl font-bold text-slate-800">Cursos de discipulado</h3>'+
+    '<p class="text-xs sm:text-sm text-slate-500">Rutas de crecimiento. Cada curso tiene varias promociones.</p></div>'+
+    (puede(['pastor','lider'])?'<button onclick="formCurso()" class="px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white font-semibold rounded-xl flex items-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i>Nuevo curso</button>':'')+
+    '</div><div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">'+
+    (cur.length?cur.map(function(c){
+      var k=cc(c.color);
+      var nl=lec.filter(function(l){return l.course_id===c.id;}).length;
+      var nc=coh.filter(function(x){return x.course_id===c.id;}).length;
+      return '<div class="'+k[0]+' rounded-2xl border '+k[1]+' p-5 hover:shadow-md transition cursor-pointer active:scale-[.98]" onclick="verCurso(\''+c.id+'\')">'+
+        '<div class="flex items-center gap-3 mb-3"><div class="text-3xl">'+esc(c.icono)+'</div>'+
+        '<div class="flex-1 min-w-0"><div class="text-xs uppercase tracking-wider '+k[2]+'">Nivel '+c.nivel+'</div>'+
+        '<h4 class="font-bold text-slate-800 truncate">'+esc(c.nombre)+'</h4></div></div>'+
+        '<p class="text-sm text-slate-600 mb-3 lc2">'+esc(c.descripcion||'')+'</p>'+
+        '<div class="flex gap-3 text-xs text-slate-500"><span class="flex items-center gap-1"><i data-lucide="book-open" class="w-3 h-3"></i>'+nl+' lecciones</span>'+
+        '<span class="flex items-center gap-1"><i data-lucide="graduation-cap" class="w-3 h-3"></i>'+nc+' promociones</span></div></div>';
+    }).join(''):vacio('book-open','Sin cursos. Crea el primero.'))+'</div>';
+  ri();
+}
+function formCurso(c){
+  c=c||{};
+  modal('mCu', mHead((c.id?'Editar':'Nuevo')+' curso','mCu')+
+   '<form id="fCu" class="p-4 space-y-3">'+
+   '<div class="grid grid-cols-4 gap-2"><input name="icono" placeholder="📖" value="'+esc(c.icono||'📖')+'" maxlength="3" class="px-3 py-2.5 border border-slate-300 rounded-lg text-center text-2xl">'+
+   '<input name="nombre" required placeholder="Nombre del curso" value="'+esc(c.nombre||'')+'" class="col-span-3 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+   '<textarea name="descripcion" placeholder="Descripción" rows="2" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg">'+esc(c.descripcion||'')+'</textarea>'+
+   '<div class="grid grid-cols-3 gap-2">'+
+     '<div><label class="text-xs text-slate-500">Nivel</label><input name="nivel" type="number" min="1" value="'+(c.nivel||1)+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+     '<div><label class="text-xs text-slate-500">Orden</label><input name="orden" type="number" value="'+(c.orden||0)+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+     '<div><label class="text-xs text-slate-500">Color</label><select name="color" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg">'+
+       Object.keys(COLS).map(function(k){return '<option value="'+k+'"'+(c.color===k?' selected':'')+'>'+k+'</option>';}).join('')+'</select></div></div>'+
+   '<div class="grid grid-cols-2 gap-2">'+
+     '<div><label class="text-xs text-slate-500">% asistencia mín.</label><input name="min_asistencia" type="number" min="0" max="100" value="'+(c.min_asistencia==null?80:c.min_asistencia)+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+     '<div><label class="text-xs text-slate-500">Nota mínima</label><input name="nota_minima" type="number" step="0.01" min="0" max="100" value="'+(c.nota_minima==null?70:c.nota_minima)+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div></div>'+
+   mFoot('mCu')+'</form>');
+  document.getElementById('fCu').onsubmit=async function(e){
+    e.preventDefault();
+    try{
+      var fd=new FormData(e.target);
+      var b={ nombre:fd.get('nombre'), icono:fd.get('icono')||'📖', descripcion:fd.get('descripcion')||null,
+        nivel:parseInt(fd.get('nivel'))||1, orden:parseInt(fd.get('orden'))||0, color:fd.get('color')||'indigo',
+        min_asistencia:parseInt(fd.get('min_asistencia'))||80, nota_minima:parseFloat(fd.get('nota_minima'))||70 };
+      if(c.id) await dbPatch('discipleship_courses','id=eq.'+c.id,b); else await dbPost('discipleship_courses',b);
+      toast('Guardado','success'); closeModal('mCu'); verCursos();
+    }catch(err){ toast(err.message.slice(0,120),'error'); }
+  };
+}
+async function borrarCurso(id,n){ if(!confirm('¿Eliminar el curso "'+n+'" con todas sus lecciones y promociones?'))return; try{ await dbDel('discipleship_courses','id=eq.'+id); toast('Eliminado','success'); verCursos(); }catch(e){ toast(e.message.slice(0,120),'error'); } }
+
+async function verCurso(cid){
+  var c=(await dbGet('discipleship_courses','id=eq.'+cid+'&select=*'))[0];
+  var lec=await dbGet('discipleship_lessons','course_id=eq.'+cid+'&select=*&order=numero');
+  var coh=await dbGet('discipleship_cohorts','course_id=eq.'+cid+'&select=*,members!discipleship_cohorts_maestro_id_fkey(nombre)&order=fecha_inicio.desc');
+  var k=cc(c.color);
+  var p=document.getElementById('page');
+  p.innerHTML='<button onclick="verCursos()" class="text-sm text-slate-500 hover:text-indigo-600 mb-3 flex items-center gap-1"><i data-lucide="arrow-left" class="w-4 h-4"></i>Volver a cursos</button>'+
+   '<div class="'+k[0]+' border '+k[1]+' rounded-2xl p-5 mb-5"><div class="flex items-start gap-3 flex-wrap">'+
+   '<div class="text-4xl">'+esc(c.icono)+'</div><div class="flex-1 min-w-0"><div class="text-xs uppercase '+k[2]+'">Nivel '+c.nivel+'</div>'+
+   '<h3 class="text-xl sm:text-2xl font-bold">'+esc(c.nombre)+'</h3><p class="text-sm text-slate-600 mt-1">'+esc(c.descripcion||'')+'</p>'+
+   '<div class="flex gap-3 text-xs text-slate-500 mt-2 flex-wrap"><span>Asist. mín: '+c.min_asistencia+'%</span><span>Nota mín: '+c.nota_minima+'</span></div></div>'+
+   '<div class="flex gap-1 flex-shrink-0">'+
+   (puede(['pastor','lider'])?'<button onclick=\'formCurso('+JSON.stringify(c).replace(/'/g,"&#39;")+')\' class="p-2 bg-white border border-slate-200 rounded-lg"><i data-lucide="pencil" class="w-4 h-4"></i></button>':'')+
+   (puede(['pastor'])?'<button onclick="borrarCurso(\''+c.id+'\',\''+esc(c.nombre).replace(/'/g,"")+'\')" class="p-2 bg-red-100 text-red-700 rounded-lg"><i data-lucide="trash-2" class="w-4 h-4"></i></button>':'')+
+   '</div></div></div>'+
+
+   '<div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 mb-5"><div class="flex items-center justify-between mb-3 flex-wrap gap-2">'+
+   '<h4 class="font-bold flex items-center gap-1.5"><i data-lucide="book-open" class="w-4 h-4"></i>Lecciones ('+lec.length+')</h4>'+
+   (puede(['pastor','lider','servidor'])?'<button onclick="formLeccion(\''+cid+'\')" class="px-3 py-2 '+k[3]+' text-white rounded-lg text-sm font-medium flex items-center gap-1.5"><i data-lucide="plus" class="w-3.5 h-3.5"></i>Agregar</button>':'')+
+   '</div><div class="space-y-2">'+
+   (lec.length?lec.map(function(l){
+     return '<div class="border border-slate-200 rounded-xl p-3 flex items-start gap-3">'+
+       '<div class="w-10 h-10 rounded-full '+k[0]+' '+k[2]+' flex items-center justify-center font-bold flex-shrink-0">'+l.numero+'</div>'+
+       '<div class="flex-1 min-w-0"><div class="font-semibold">'+esc(l.titulo)+'</div>'+
+       (l.descripcion?'<div class="text-sm text-slate-600">'+esc(l.descripcion)+'</div>':'')+
+       '<div class="flex flex-wrap gap-3 mt-1 text-xs">'+
+       (l.pdf_url?'<a href="'+esc(l.pdf_url)+'" target="_blank" class="text-indigo-600 hover:underline flex items-center gap-0.5"><i data-lucide="file-text" class="w-3 h-3"></i>PDF</a>':'')+
+       (l.video_url?'<a href="'+esc(l.video_url)+'" target="_blank" class="text-red-600 hover:underline flex items-center gap-0.5"><i data-lucide="video" class="w-3 h-3"></i>Video</a>':'')+
+       (l.material_extra?'<a href="'+esc(l.material_extra)+'" target="_blank" class="text-slate-600 hover:underline flex items-center gap-0.5"><i data-lucide="link" class="w-3 h-3"></i>Extra</a>':'')+
+       '</div></div><div class="flex gap-1">'+
+       '<button onclick="editarLeccion(\''+l.id+'\',\''+cid+'\')" class="p-1.5 hover:bg-slate-100 rounded"><i data-lucide="pencil" class="w-4 h-4"></i></button>'+
+       (puede(['pastor','lider'])?'<button onclick="borrarLeccion(\''+l.id+'\',\''+cid+'\')" class="p-1.5 hover:bg-red-100 rounded text-red-600"><i data-lucide="trash-2" class="w-4 h-4"></i></button>':'')+
+       '</div></div>';
+   }).join(''):'<p class="text-slate-400 text-sm text-center py-4">Sin lecciones. Agrega la primera.</p>')+'</div></div>'+
+
+   '<div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5"><div class="flex items-center justify-between mb-3 flex-wrap gap-2">'+
+   '<h4 class="font-bold flex items-center gap-1.5"><i data-lucide="graduation-cap" class="w-4 h-4"></i>Promociones ('+coh.length+')</h4>'+
+   (puede(['pastor','lider'])?'<button onclick="formPromo(\''+cid+'\')" class="px-3 py-2 '+k[3]+' text-white rounded-lg text-sm font-medium flex items-center gap-1.5"><i data-lucide="plus" class="w-3.5 h-3.5"></i>Nueva</button>':'')+
+   '</div><div class="grid sm:grid-cols-2 gap-3">'+
+   (coh.length?coh.map(function(o){
+     var bd=o.estado==='activo'?'bg-emerald-100 text-emerald-700':(o.estado==='finalizado'?'bg-slate-200 text-slate-700':'bg-red-100 text-red-700');
+     return '<div class="border border-slate-200 rounded-xl p-3 hover:shadow-md transition cursor-pointer active:scale-[.98]" onclick="verPromo(\''+o.id+'\')">'+
+       '<div class="flex items-center justify-between mb-1 gap-2"><div class="font-semibold truncate">'+esc(o.nombre)+'</div>'+
+       '<span class="text-xs px-2 py-0.5 rounded-full '+bd+' flex-shrink-0">'+esc(o.estado)+'</span></div>'+
+       '<div class="text-xs text-slate-500 space-y-0.5">'+
+       (o.fecha_inicio?'<div class="flex items-center gap-1"><i data-lucide="calendar" class="w-3 h-3"></i>'+fecha(o.fecha_inicio)+' → '+(o.fecha_fin?fecha(o.fecha_fin):'?')+'</div>':'')+
+       (o.members?'<div class="flex items-center gap-1"><i data-lucide="user-check" class="w-3 h-3"></i>'+esc(o.members.nombre)+'</div>':'')+
+       '</div></div>';
+   }).join(''):'<p class="text-slate-400 text-sm col-span-full text-center py-4">Sin promociones.</p>')+'</div></div>';
+  ri();
+}
+async function editarLeccion(id,cid){ var l=(await dbGet('discipleship_lessons','id=eq.'+id+'&select=*'))[0]; formLeccion(cid,l); }
+function formLeccion(cid,l){
+  l=l||{};
+  modal('mLe', mHead((l.id?'Editar':'Nueva')+' lección','mLe')+
+   '<form id="fLe" class="p-4 space-y-3">'+
+   '<div class="grid grid-cols-4 gap-2"><div><label class="text-xs text-slate-500">N°</label><input name="numero" type="number" required min="1" value="'+(l.numero||1)+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+   '<div class="col-span-3"><label class="text-xs text-slate-500">Título *</label><input name="titulo" required value="'+esc(l.titulo||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div></div>'+
+   '<textarea name="descripcion" placeholder="Breve descripción" rows="2" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg">'+esc(l.descripcion||'')+'</textarea>'+
+   '<textarea name="contenido" placeholder="Contenido / guion completo (opcional)" rows="3" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm">'+esc(l.contenido||'')+'</textarea>'+
+   '<input name="pdf_url" placeholder="URL del PDF (Drive, Dropbox...)" value="'+esc(l.pdf_url||'')+'" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg">'+
+   '<input name="video_url" placeholder="URL del video (YouTube...)" value="'+esc(l.video_url||'')+'" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg">'+
+   '<input name="material_extra" placeholder="Material extra" value="'+esc(l.material_extra||'')+'" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg">'+
+   mFoot('mLe')+'</form>');
+  document.getElementById('fLe').onsubmit=async function(e){
+    e.preventDefault();
+    try{
+      var fd=new FormData(e.target);
+      var b={ course_id:cid, numero:parseInt(fd.get('numero'))||1, titulo:fd.get('titulo'), descripcion:fd.get('descripcion')||null,
+        contenido:fd.get('contenido')||null, pdf_url:fd.get('pdf_url')||null, video_url:fd.get('video_url')||null, material_extra:fd.get('material_extra')||null };
+      if(l.id) await dbPatch('discipleship_lessons','id=eq.'+l.id,b); else await dbPost('discipleship_lessons',b);
+      toast('Lección guardada','success'); closeModal('mLe'); verCurso(cid);
+    }catch(err){ toast(err.message.slice(0,150),'error'); }
+  };
+}
+async function borrarLeccion(id,cid){ if(!confirm('¿Eliminar esta lección?'))return; try{ await dbDel('discipleship_lessons','id=eq.'+id); toast('Eliminada','success'); verCurso(cid); }catch(e){ toast(e.message.slice(0,120),'error'); } }
+
+async function formPromo(cid,o){
+  o=o||{};
+  var mem=await cat('members','select=id,nombre&order=nombre');
+  modal('mPr', mHead((o.id?'Editar':'Nueva')+' promoción','mPr')+
+   '<form id="fPr" class="p-4 space-y-3">'+
+   '<div><label class="text-sm font-medium">Nombre *</label><input name="nombre" required placeholder="Ej: Enero 2026" value="'+esc(o.nombre||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+   '<div class="grid grid-cols-2 gap-2">'+
+     '<div><label class="text-xs text-slate-500">Inicio</label><input name="fecha_inicio" type="date" value="'+esc(o.fecha_inicio||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+     '<div><label class="text-xs text-slate-500">Fin</label><input name="fecha_fin" type="date" value="'+esc(o.fecha_fin||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div></div>'+
+   '<div><label class="text-sm font-medium">Maestro / Facilitador</label><select name="maestro_id" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"><option value="">Sin asignar</option>'+
+     mem.map(function(m){return '<option value="'+m.id+'"'+(o.maestro_id===m.id?' selected':'')+'>'+esc(m.nombre)+'</option>';}).join('')+'</select></div>'+
+   '<div><label class="text-sm font-medium">Estado</label><select name="estado" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg">'+
+     ['activo','finalizado','cancelado'].map(function(x){return '<option value="'+x+'"'+(o.estado===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select></div>'+
+   mFoot('mPr')+'</form>');
+  document.getElementById('fPr').onsubmit=async function(e){
+    e.preventDefault();
+    try{
+      var fd=new FormData(e.target);
+      var b={ course_id:cid, nombre:fd.get('nombre'), fecha_inicio:fd.get('fecha_inicio')||null, fecha_fin:fd.get('fecha_fin')||null,
+        maestro_id:fd.get('maestro_id')||null, estado:fd.get('estado')||'activo' };
+      if(o.id) await dbPatch('discipleship_cohorts','id=eq.'+o.id,b); else await dbPost('discipleship_cohorts',b);
+      toast('Guardada','success'); closeModal('mPr'); verCurso(cid);
+    }catch(err){ toast(err.message.slice(0,120),'error'); }
+  };
+}
+
+async function verPromo(id){
+  var o=(await dbGet('discipleship_cohorts','id=eq.'+id+'&select=*,discipleship_courses(*),members!discipleship_cohorts_maestro_id_fkey(nombre)'))[0];
+  var c=o.discipleship_courses, k=cc(c.color);
+  var lec=await dbGet('discipleship_lessons','course_id=eq.'+c.id+'&select=*&order=numero');
+  var par=await dbGet('v_discipleship_progress','cohort_id=eq.'+id+'&select=*&order=miembro_nombre');
+  var att=await dbGet('discipleship_attendance','cohort_id=eq.'+id+'&select=*');
+  var mapa={}; att.forEach(function(a){ if(!mapa[a.member_id]) mapa[a.member_id]={}; mapa[a.member_id][a.lesson_id]=a; });
+
+  var p=document.getElementById('page');
+  p.innerHTML='<button onclick="verCurso(\''+c.id+'\')" class="text-sm text-slate-500 hover:text-indigo-600 mb-3 flex items-center gap-1"><i data-lucide="arrow-left" class="w-4 h-4"></i>Volver a '+esc(c.nombre)+'</button>'+
+   '<div class="'+k[0]+' border '+k[1]+' rounded-2xl p-4 sm:p-5 mb-5 flex items-start justify-between flex-wrap gap-3">'+
+   '<div class="min-w-0 flex-1"><div class="text-xs uppercase '+k[2]+'">'+esc(c.icono+' '+c.nombre)+' · '+esc(o.estado.toUpperCase())+'</div>'+
+   '<h3 class="text-xl sm:text-2xl font-bold">'+esc(o.nombre)+'</h3>'+
+   '<div class="text-xs sm:text-sm text-slate-600 mt-1 flex flex-wrap gap-3">'+
+   (o.fecha_inicio?'<span>'+fecha(o.fecha_inicio)+' → '+(o.fecha_fin?fecha(o.fecha_fin):'?')+'</span>':'')+
+   (o.members?'<span>'+esc(o.members.nombre)+'</span>':'')+'</div></div>'+
+   '<div class="flex gap-1">'+
+   (puede(['pastor','lider'])?'<button onclick=\'formPromo("'+c.id+'",'+JSON.stringify(o).replace(/'/g,"&#39;")+')\' class="p-2 bg-white border border-slate-200 rounded-lg"><i data-lucide="pencil" class="w-4 h-4"></i></button>':'')+
+   (puede(['pastor'])?'<button onclick="borrarPromo(\''+o.id+'\',\''+c.id+'\')" class="p-2 bg-red-100 text-red-700 rounded-lg"><i data-lucide="trash-2" class="w-4 h-4"></i></button>':'')+
+   '</div></div>'+
+   '<div class="flex flex-wrap gap-2 mb-4">'+
+   (puede(['pastor','lider','servidor'])?'<button onclick="agregarParticipantes(\''+id+'\')" class="px-4 py-2.5 '+k[3]+' text-white rounded-xl font-semibold flex items-center gap-2"><i data-lucide="user-plus" class="w-4 h-4"></i>Agregar participantes</button>':'')+
+   (puede(['pastor','lider'])?'<button onclick="calcularAprobacion(\''+id+'\')" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold flex items-center gap-2"><i data-lucide="target" class="w-4 h-4"></i>Calcular aprobación</button>':'')+
+   '</div>'+
+   (!lec.length?'<div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-4 text-sm text-amber-800">Este curso no tiene lecciones. Agrégalas antes de tomar asistencia.</div>':'')+
+   '<div class="bg-white rounded-2xl border border-slate-200 overflow-x-auto"><table class="min-w-full text-sm"><thead class="bg-slate-100"><tr>'+
+   '<th class="p-3 text-left sticky left-0 bg-slate-100 z-10 min-w-[140px]">Participante</th>'+
+   lec.map(function(l){return '<th class="p-2 text-center min-w-[48px]" title="'+esc(l.titulo)+'">L'+l.numero+'</th>';}).join('')+
+   '<th class="p-2 text-center bg-slate-200">% Asist.</th><th class="p-2 text-center bg-slate-200">Nota</th><th class="p-2 text-center bg-slate-200">Estado</th><th class="p-2"></th></tr></thead><tbody>'+
+   (par.length?par.map(function(x){
+     var okA=x.porcentaje_asistencia>=x.curso_min_asistencia;
+     return '<tr class="border-t hover:bg-slate-50"><td class="p-3 font-medium sticky left-0 bg-white z-10">'+esc(x.miembro_nombre)+'</td>'+
+       lec.map(function(l){
+         var a=mapa[x.member_id]&&mapa[x.member_id][l.id];
+         return '<td class="p-1 text-center"><input type="checkbox" '+(a&&a.asistio?'checked':'')+' onchange="marcarLeccion(\''+id+'\',\''+l.id+'\',\''+x.member_id+'\',this.checked)" class="w-5 h-5 accent-emerald-600"></td>';
+       }).join('')+
+       '<td class="p-2 text-center font-semibold '+(okA?'text-emerald-600':'text-red-600')+'">'+(x.porcentaje_asistencia||0)+'%</td>'+
+       '<td class="p-2 text-center"><input type="number" step="0.01" min="0" max="100" value="'+(x.nota_final==null?'':x.nota_final)+'" placeholder="—" onchange="guardarNota(\''+x.participant_id+'\',this.value)" class="w-14 px-1 py-1 border rounded text-center text-xs"></td>'+
+       '<td class="p-2 text-center">'+(x.aprobado===true?'<span class="text-emerald-600 font-bold text-xs">Aprobado</span>':(x.aprobado===false?'<span class="text-red-600 font-bold text-xs">Reprobado</span>':'<span class="text-slate-400">—</span>'))+'</td>'+
+       '<td class="p-2 text-center whitespace-nowrap">'+
+       (x.aprobado?'<button onclick="verDiploma(\''+x.participant_id+'\')" class="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white text-xs rounded font-medium inline-flex items-center gap-1"><i data-lucide="award" class="w-3 h-3"></i>Diploma</button>':'')+
+       (puede(['pastor','lider'])?'<button onclick="quitarParticipante(\''+x.participant_id+'\',\''+id+'\')" class="p-1 hover:bg-red-100 rounded text-red-600"><i data-lucide="trash-2" class="w-3 h-3"></i></button>':'')+
+       '</td></tr>';
+   }).join(''):'<tr><td colspan="'+(lec.length+5)+'" class="p-6 text-slate-400 text-center">Sin participantes inscritos.</td></tr>')+
+   '</tbody></table></div>';
+  ri();
+}
+async function borrarPromo(id,cid){ if(!confirm('¿Eliminar esta promoción?'))return; try{ await dbDel('discipleship_cohorts','id=eq.'+id); toast('Eliminada','success'); verCurso(cid); }catch(e){ toast(e.message.slice(0,120),'error'); } }
+
+async function agregarParticipantes(cid){
+  var ex=await dbGet('discipleship_participants','cohort_id=eq.'+cid+'&select=member_id');
+  var ya={}; ex.forEach(function(e){ ya[e.member_id]=1; });
+  var mem=await cat('members','select=id,nombre&order=nombre');
+  var disp=mem.filter(function(m){ return !ya[m.id]; });
+  if(!disp.length){ toast('Todos los miembros ya están inscritos','info'); return; }
+  modal('mAP', mHead('Agregar participantes','mAP')+'<div class="p-4">'+
+    '<div class="relative mb-3"><i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>'+
+    '<input id="fltP" placeholder="Filtrar..." class="w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+    '<div id="listP" class="max-h-80 overflow-y-auto border border-slate-200 rounded-xl p-2 space-y-1">'+
+    disp.map(function(m){ return '<label class="flex items-center gap-2 p-3 hover:bg-indigo-50 rounded-lg cursor-pointer"><input type="checkbox" value="'+m.id+'" class="chkP accent-indigo-600 w-4 h-4"><span class="text-sm">'+esc(m.nombre)+'</span></label>'; }).join('')+
+    '</div><div class="flex gap-2 mt-4"><button onclick="closeModal(\'mAP\')" class="flex-1 py-3 bg-slate-100 rounded-xl font-medium">Cancelar</button>'+
+    '<button onclick="guardarParticipantes(\''+cid+'\')" class="flex-1 py-3 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-semibold">Agregar</button></div></div>');
+  document.getElementById('fltP').oninput=function(e){
+    var q=e.target.value.toLowerCase();
+    Array.prototype.slice.call(document.querySelectorAll('#listP label')).forEach(function(l){ l.style.display=l.textContent.toLowerCase().indexOf(q)!==-1?'':'none'; });
+  };
+}
+async function guardarParticipantes(cid){
+  var ids=Array.prototype.slice.call(document.querySelectorAll('.chkP:checked')).map(function(c){return c.value;});
+  if(!ids.length){ toast('Selecciona al menos uno','warning'); return; }
+  try{
+    await dbPost('discipleship_participants', ids.map(function(m){ return { cohort_id:cid, member_id:m }; }), 'return=minimal');
+    toast(ids.length+' agregados','success'); closeModal('mAP'); verPromo(cid);
+  }catch(e){ toast(e.message.slice(0,150),'error'); }
+}
+async function marcarLeccion(cid,lid,mid,ok){
+  try{ await dbUpsert('discipleship_attendance',[{ cohort_id:cid, lesson_id:lid, member_id:mid, asistio:ok, fecha:hoy() }],'cohort_id,lesson_id,member_id'); verPromo(cid); }
+  catch(e){ toast(e.message.slice(0,150),'error'); }
+}
+async function guardarNota(pid,val){
+  try{ await dbPatch('discipleship_participants','id=eq.'+pid,{ nota_final: val===''?null:parseFloat(val) }); toast('Nota guardada','success'); }
+  catch(e){ toast(e.message.slice(0,120),'error'); }
+}
+async function calcularAprobacion(cid){
+  if(!confirm('¿Calcular aprobación según % de asistencia y nota mínima del curso?')) return;
+  try{
+    var pr=await dbGet('v_discipleship_progress','cohort_id=eq.'+cid+'&select=*');
+    for(var i=0;i<pr.length;i++){
+      var x=pr[i];
+      var ap=(x.porcentaje_asistencia>=x.curso_min_asistencia) && ((x.nota_final==null?-1:x.nota_final)>=x.curso_nota_minima);
+      await dbPatch('discipleship_participants','id=eq.'+x.participant_id,{aprobado:ap});
+    }
+    toast('Aprobación calculada','success'); verPromo(cid);
+  }catch(e){ toast(e.message.slice(0,120),'error'); }
+}
+async function quitarParticipante(pid,cid){ if(!confirm('¿Quitar a este participante?'))return; try{ await dbDel('discipleship_participants','id=eq.'+pid); toast('Eliminado','success'); verPromo(cid); }catch(e){ toast(e.message.slice(0,120),'error'); } }
+
+async function verDiploma(pid){
+  try{
+    var x=(await dbGet('v_discipleship_progress','participant_id=eq.'+pid+'&select=*'))[0];
+    var f=new Date().toLocaleDateString('es-HN',{day:'numeric',month:'long',year:'numeric'});
+    modal('mDi','<div id="diploma" class="diploma p-6 sm:p-10 text-center">'+
+      '<div class="text-xs uppercase tracking-widest text-amber-900 mb-2">Iglesia ADULAM</div>'+
+      '<h2 class="text-2xl sm:text-3xl font-bold text-amber-900 mb-6" style="font-family:Georgia,serif">Diploma de Finalización</h2>'+
+      '<p class="text-sm text-amber-800 mb-1">Se otorga el presente diploma a</p>'+
+      '<div class="text-2xl sm:text-4xl font-bold my-4 text-amber-950" style="font-family:Georgia,serif">'+esc(x.miembro_nombre)+'</div>'+
+      '<p class="text-sm text-amber-800 mb-2">por haber completado satisfactoriamente el curso de</p>'+
+      '<div class="text-xl sm:text-2xl font-bold text-amber-900 mb-6">'+esc(x.curso_nombre)+'</div>'+
+      '<div class="grid grid-cols-2 gap-4 text-sm text-amber-900 mb-6"><div><div class="font-bold">Asistencia</div><div>'+x.porcentaje_asistencia+'%</div></div>'+
+      '<div><div class="font-bold">Calificación</div><div>'+(x.nota_final==null?'—':x.nota_final)+'</div></div></div>'+
+      '<div class="text-xs text-amber-800 mb-8">Promoción '+esc(x.cohort_nombre)+'</div>'+
+      '<div class="border-t-2 border-amber-900 pt-4 w-48 mx-auto text-xs text-amber-900">'+f+'<br>López Arellano, Honduras</div></div>'+
+      '<div class="p-4 bg-slate-100 flex gap-2 np"><button onclick="descargarDiploma()" class="flex-1 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2"><i data-lucide="download" class="w-4 h-4"></i>Descargar</button>'+
+      '<button onclick="closeModal(\'mDi\')" class="py-3 px-6 bg-slate-300 rounded-xl">Cerrar</button></div>');
+    dbPatch('discipleship_participants','id=eq.'+pid,{diploma_generado:true}).catch(function(){});
+  }catch(e){ toast(e.message.slice(0,120),'error'); }
+}
+async function descargarDiploma(){
+  toast('Generando...','info');
+  try{
+    if(!window.html2canvas){ await new Promise(function(res,rej){ var s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js'; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
+    var cv=await html2canvas(document.getElementById('diploma'),{scale:2,backgroundColor:'#fef3c7'});
+    cv.toBlob(function(b){ var u=URL.createObjectURL(b); var a=document.createElement('a'); a.href=u; a.download='diploma-adulam-'+hoy()+'.png'; a.click(); URL.revokeObjectURL(u); toast('Diploma descargado','success'); });
+  }catch(e){ toast('Error: '+e.message.slice(0,80),'error'); }
+}
+
+/* ---------- REDES SOCIALES ---------- */
+async function view_social(){
+  var p=document.getElementById('page');
+  p.innerHTML='<div class="flex flex-col sm:flex-row gap-3 mb-5">'+
+    '<select id="soEstado" class="px-3 py-2.5 border border-slate-300 rounded-lg bg-white"><option value="">Todos los estados</option>'+
+    ['pendiente','en_diseno','aprobado','publicado'].map(function(x){return '<option value="'+x+'">'+x.replace('_',' ')+'</option>';}).join('')+'</select>'+
+    (puede(['pastor','lider','servidor'])?'<button onclick="formPost()" class="sm:ml-auto px-5 py-2.5 bg-pink-600 hover:bg-pink-700 text-white font-semibold rounded-xl flex items-center justify-center gap-2"><i data-lucide="plus" class="w-5 h-5"></i>Nuevo contenido</button>':'')+
+    '</div><div id="soGrid" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>';
+  ri(); await cat('members','select=id,nombre&order=nombre');
+  document.getElementById('soEstado').onchange=pintarPosts;
+  await pintarPosts();
+}
+async function pintarPosts(){
+  var est=document.getElementById('soEstado').value;
+  var q='select=*,members(nombre)&order=fecha_programada.asc.nullslast';
+  if(est) q+='&estado=eq.'+est;
+  var d=await dbGet('social_posts',q);
+  var cl={pendiente:'bg-slate-100 text-slate-700',en_diseno:'bg-amber-100 text-amber-700',aprobado:'bg-blue-100 text-blue-700',publicado:'bg-emerald-100 text-emerald-700'};
+  var ic={instagram:'instagram',facebook:'facebook',tiktok:'music-2',whatsapp:'message-circle'};
+  var g=document.getElementById('soGrid');
+  if(!d.length){ g.innerHTML=vacio('share-2','Sin contenido planificado.'); ri(); return; }
+  g.innerHTML=d.map(function(p){
+    return '<div class="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-md transition">'+
+      (p.imagen_url?'<img src="'+esc(p.imagen_url)+'" class="w-full h-40 object-cover">':'')+
+      '<div class="p-4"><div class="flex items-center justify-between mb-2">'+
+      '<div class="w-9 h-9 rounded-lg bg-pink-100 text-pink-700 flex items-center justify-center"><i data-lucide="'+(ic[p.plataforma]||'share-2')+'" class="w-4 h-4"></i></div>'+
+      '<span class="px-2 py-0.5 rounded-full text-xs font-semibold '+(cl[p.estado]||'')+'">'+esc(p.estado.replace('_',' '))+'</span></div>'+
+      '<h4 class="font-bold text-slate-800 mb-1">'+esc(p.titulo)+'</h4>'+
+      '<p class="text-sm text-slate-600 mb-3 lc2">'+esc(p.descripcion||'')+'</p>'+
+      '<div class="text-xs text-slate-500 space-y-1">'+
+      (p.fecha_programada?'<div class="flex items-center gap-1"><i data-lucide="calendar" class="w-3 h-3"></i>'+fecha(p.fecha_programada)+'</div>':'')+
+      (p.members?'<div class="flex items-center gap-1"><i data-lucide="user" class="w-3 h-3"></i>'+esc(p.members.nombre)+'</div>':'')+'</div>'+
+      '<div class="flex gap-1 mt-3">'+
+      '<button onclick="editarPost(\''+p.id+'\')" class="flex-1 py-2 text-sm bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>'+
+      '<button onclick="avanzarPost(\''+p.id+'\',\''+p.estado+'\')" class="flex-1 py-2 text-sm bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-lg font-medium flex items-center justify-center gap-1"><i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>Avanzar</button>'+
+      (puede(['pastor','lider'])?'<button onclick="borrarPost(\''+p.id+'\')" class="py-2 px-3 text-sm bg-red-100 hover:bg-red-200 text-red-700 rounded-lg flex items-center justify-center"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>':'')+
+      '</div></div></div>';
+  }).join('');
+  ri();
+}
+async function editarPost(id){ var d=(await dbGet('social_posts','id=eq.'+id+'&select=*'))[0]; formPost(d); }
+function formPost(p){
+  p=p||{}; var mem=S.cache.members||[];
+  modal('mSo', mHead((p.id?'Editar':'Nuevo')+' contenido','mSo')+
+   '<form id="fSo" class="p-4 space-y-3">'+
+   '<div><label class="text-sm font-medium">Título *</label><input name="titulo" required value="'+esc(p.titulo||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+   '<div><label class="text-sm font-medium">Descripción / copy</label><textarea name="descripcion" rows="3" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg">'+esc(p.descripcion||'')+'</textarea></div>'+
+   '<div class="grid grid-cols-2 gap-3">'+
+     '<div><label class="text-sm font-medium">Plataforma</label><select name="plataforma" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg">'+
+       ['instagram','facebook','tiktok','whatsapp'].map(function(x){return '<option value="'+x+'"'+(p.plataforma===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select></div>'+
+     '<div><label class="text-sm font-medium">Estado</label><select name="estado" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg">'+
+       ['pendiente','en_diseno','aprobado','publicado'].map(function(x){return '<option value="'+x+'"'+(p.estado===x?' selected':'')+'>'+x.replace('_',' ')+'</option>';}).join('')+'</select></div></div>'+
+   '<div><label class="text-sm font-medium">Fecha programada</label><input name="fecha_programada" type="date" value="'+esc(p.fecha_programada||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+   '<div><label class="text-sm font-medium">Responsable</label><select name="responsable_id" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"><option value="">Sin responsable</option>'+
+     mem.map(function(m){return '<option value="'+m.id+'"'+(p.responsable_id===m.id?' selected':'')+'>'+esc(m.nombre)+'</option>';}).join('')+'</select></div>'+
+   '<div><label class="text-sm font-medium">URL de imagen</label><input name="imagen_url" placeholder="https://..." value="'+esc(p.imagen_url||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+   mFoot('mSo')+'</form>');
+  document.getElementById('fSo').onsubmit=async function(e){
+    e.preventDefault();
+    try{
+      var fd=new FormData(e.target);
+      var b={ titulo:fd.get('titulo'), descripcion:fd.get('descripcion')||null, plataforma:fd.get('plataforma'), estado:fd.get('estado'),
+        fecha_programada:fd.get('fecha_programada')||null, responsable_id:fd.get('responsable_id')||null, imagen_url:fd.get('imagen_url')||null };
+      if(p.id) await dbPatch('social_posts','id=eq.'+p.id,b); else await dbPost('social_posts',b);
+      toast('Guardado','success'); closeModal('mSo'); pintarPosts();
+    }catch(err){ toast(err.message.slice(0,120),'error'); }
+  };
+}
+async function avanzarPost(id,act){
+  var or=['pendiente','en_diseno','aprobado','publicado'];
+  var sig=or[(or.indexOf(act)+1)%or.length];
+  try{ await dbPatch('social_posts','id=eq.'+id,{estado:sig}); toast('Estado: '+sig,'success'); pintarPosts(); }catch(e){ toast(e.message.slice(0,120),'error'); }
+}
+async function borrarPost(id){ if(!confirm('¿Eliminar este contenido?'))return; try{ await dbDel('social_posts','id=eq.'+id); pintarPosts(); }catch(e){ toast(e.message.slice(0,120),'error'); } }
+
+/* ---------- AUTOMATIZACIONES ---------- */
+async function view_automations(){
+  if(!puede(['pastor','lider'])){ document.getElementById('page').innerHTML=vacio('lock','Sin acceso.'); ri(); return; }
+  var p=document.getElementById('page');
+  p.innerHTML='<div class="bg-indigo-50 border border-indigo-200 rounded-2xl p-5 mb-5 flex items-start gap-3">'+
+    '<div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center flex-shrink-0"><i data-lucide="zap" class="w-5 h-5"></i></div>'+
+    '<div><h3 class="font-bold text-indigo-900">Reglas automáticas</h3><p class="text-sm text-indigo-800 mt-0.5">Listas para conectarse con BuilderBot + WhatsApp. Por ahora generan alertas internas.</p></div></div>'+
+    '<div class="grid gap-3 mb-6">'+
+    regla('user-minus','slate','Inactividad automática','Marca inactivo tras 3 faltas seguidas.','auto_mark_inactive','indigo')+
+    regla('alert-triangle','amber','Sin discipulado','Detecta miembros sin proceso asignado.','auto_alert_sin_discipulador','amber')+
+    '<div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 flex items-center gap-3">'+
+    '<div class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0"><i data-lucide="message-circle" class="w-6 h-6"></i></div>'+
+    '<div class="flex-1 min-w-0"><h4 class="font-bold">Mensaje a nuevos</h4><p class="text-xs sm:text-sm text-slate-500">Genera bienvenida para miembros nuevos.</p></div>'+
+    '<button onclick="simularWhatsapp()" class="px-3 sm:px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-lg font-medium flex items-center gap-1.5"><i data-lucide="send" class="w-3.5 h-3.5"></i>Generar</button></div>'+
+    '</div><h3 class="text-lg font-bold mb-3 flex items-center gap-2"><i data-lucide="history" class="w-5 h-5 text-slate-500"></i>Historial de alertas</h3>'+
+    '<div id="auLogs" class="space-y-2"></div>';
+  ri(); await pintarLogs();
+}
+function regla(ic,color,tit,desc,fn,btn){
+  return '<div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 flex items-center gap-3">'+
+    '<div class="w-12 h-12 rounded-xl bg-'+color+'-100 text-'+color+'-700 flex items-center justify-center flex-shrink-0"><i data-lucide="'+ic+'" class="w-6 h-6"></i></div>'+
+    '<div class="flex-1 min-w-0"><h4 class="font-bold">'+tit+'</h4><p class="text-xs sm:text-sm text-slate-500">'+desc+'</p></div>'+
+    '<button onclick="ejecutarRegla(\''+fn+'\')" class="px-3 sm:px-4 py-2 bg-'+btn+'-600 hover:bg-'+btn+'-700 text-white text-sm rounded-lg font-medium flex items-center gap-1.5"><i data-lucide="play" class="w-3.5 h-3.5"></i>Ejecutar</button></div>';
+}
+async function ejecutarRegla(fn){
+  toast('Ejecutando...','info');
+  try{
+    var r=await req('/rest/v1/rpc/'+fn,{ method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+    if(!r.ok) throw new Error(await r.text());
+    toast('Ejecutado','success'); pintarLogs();
+  }catch(e){ toast(e.message.slice(0,120),'error'); }
+}
+async function simularWhatsapp(){
+  try{
+    var nu=await dbGet('members','estado_espiritual=eq.nuevo&select=id,nombre');
+    if(!nu.length){ toast('No hay miembros nuevos','info'); return; }
+    await dbPost('automation_logs', nu.map(function(m){ return { tipo:'nuevo_miembro', member_id:m.id, mensaje:'[WhatsApp simulado] Hola '+m.nombre+', te damos la bienvenida a ADULAM.', enviado:false }; }), 'return=minimal');
+    toast(nu.length+' mensajes generados','success'); pintarLogs();
+  }catch(e){ toast(e.message.slice(0,120),'error'); }
+}
+async function pintarLogs(){
+  var d=await dbGet('automation_logs','select=*,members(nombre,telefono)&order=created_at.desc&limit=30');
+  var c=document.getElementById('auLogs');
+  if(!d.length){ c.innerHTML='<div class="bg-white rounded-2xl border p-8 text-center text-slate-400"><i data-lucide="inbox" class="w-10 h-10 mx-auto mb-2 opacity-40"></i><p>Sin alertas registradas.</p></div>'; ri(); return; }
+  var ic={inactividad:'user-minus',sin_discipulador:'alert-triangle',nuevo_miembro:'sparkles'};
+  c.innerHTML=d.map(function(l){
+    return '<div class="bg-white border border-slate-200 rounded-xl p-3 flex items-start gap-3">'+
+      '<div class="w-9 h-9 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center flex-shrink-0"><i data-lucide="'+(ic[l.tipo]||'bell')+'" class="w-4 h-4"></i></div>'+
+      '<div class="flex-1 min-w-0"><div class="text-sm text-slate-700">'+esc(l.mensaje)+'</div>'+
+      '<div class="text-xs text-slate-400 flex flex-wrap gap-x-3 mt-1"><span>'+fecha(l.created_at)+'</span>'+
+      (l.members?'<span>'+esc(l.members.nombre)+'</span>':'')+
+      (l.members&&l.members.telefono?'<span>'+esc(l.members.telefono)+'</span>':'')+'</div></div>'+
+      '<div class="flex flex-col items-end gap-1 flex-shrink-0"><span class="text-xs '+(l.enviado?'text-emerald-600':'text-amber-600')+'">'+(l.enviado?'Enviado':'Pendiente')+'</span>'+
+      (!l.enviado?'<button onclick="marcarEnviado(\''+l.id+'\')" class="text-xs px-2 py-1 bg-emerald-100 text-emerald-700 rounded">Marcar</button>':'')+'</div></div>';
+  }).join('');
+  ri();
+}
+async function marcarEnviado(id){ try{ await dbPatch('automation_logs','id=eq.'+id,{enviado:true}); pintarLogs(); }catch(e){ toast(e.message.slice(0,120),'error'); } }
+
+/* =====================================================================
+   ARRANQUE
+   ===================================================================== */
+function mostrar(vista){
+  document.getElementById('loaderView').classList.add('hidden');
+  document.getElementById('loginView').classList.add('hidden');
+  document.getElementById('appView').classList.add('hidden');
+  document.getElementById(vista).classList.remove('hidden');
+  if(vista==='appView') document.getElementById('appView').classList.add('flex');
+  ri();
+}
+
+function mostrarLogin(){ mostrar('loginView'); }
+
+async function entrarApp(){
+  document.getElementById('userName').textContent = S.profile.nombre||'Usuario';
+  document.getElementById('userRole').textContent = S.profile.rol||'miembro';
+  document.getElementById('avatarIni').textContent = (S.profile.nombre||'U')[0].toUpperCase();
+  mostrar('appView');
+  pintarMenu();
+  ir('dashboard');
+}
+
+/* Tabs del login */
+document.getElementById('tabL').onclick=function(){
+  this.className='flex-1 py-2.5 font-semibold text-sm rounded-lg bg-white text-indigo-700 shadow-sm';
+  document.getElementById('tabR').className='flex-1 py-2.5 font-semibold text-sm rounded-lg text-slate-500';
+  document.getElementById('formL').classList.remove('hidden');
+  document.getElementById('formR').classList.add('hidden');
+  document.getElementById('loginMsg').textContent='';
+};
+document.getElementById('tabR').onclick=function(){
+  this.className='flex-1 py-2.5 font-semibold text-sm rounded-lg bg-white text-indigo-700 shadow-sm';
+  document.getElementById('tabL').className='flex-1 py-2.5 font-semibold text-sm rounded-lg text-slate-500';
+  document.getElementById('formR').classList.remove('hidden');
+  document.getElementById('formL').classList.add('hidden');
+  document.getElementById('loginMsg').textContent='';
+};
+document.getElementById('formL').onsubmit=async function(e){
+  e.preventDefault();
+  var msg=document.getElementById('loginMsg');
+  msg.innerHTML='<span class="text-slate-500">Entrando...</span>';
+  try{
+    await login(document.getElementById('lEmail').value, document.getElementById('lPass').value);
+    await entrarApp();
+  }catch(err){ msg.innerHTML='<span class="text-red-600">'+esc(err.message)+'</span>'; }
+};
+document.getElementById('formR').onsubmit=async function(e){
+  e.preventDefault();
+  var msg=document.getElementById('loginMsg');
+  msg.innerHTML='<span class="text-slate-500">Creando cuenta...</span>';
+  try{
+    await registrar(document.getElementById('rEmail').value, document.getElementById('rPass').value, document.getElementById('rNom').value);
+    msg.innerHTML='<span class="text-emerald-600">Cuenta creada. Ya puedes iniciar sesión.</span>';
+  }catch(err){ msg.innerHTML='<span class="text-red-600">'+esc(err.message)+'</span>'; }
+};
+
+/* Inicio */
+(async function init(){
+  ri();
+  var lm=document.getElementById('loaderMsg');
+
+  // Aviso: la app debe abrirse por http(s), no como archivo local
+  var org = window.location.protocol;
+  if(org !== 'http:' && org !== 'https:'){
+    document.getElementById('loaderView').innerHTML =
+      '<div class="max-w-md mx-auto p-6 text-center">'+
+      '<div class="w-14 h-14 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4"><i data-lucide="alert-triangle" class="w-7 h-7"></i></div>'+
+      '<h2 class="text-xl font-bold text-slate-800 mb-2">Abre la app desde su dirección web</h2>'+
+      '<p class="text-sm text-slate-600 mb-4">Estás abriendo el archivo descargado (<code>'+org+'</code>). Desde ahí el navegador bloquea la conexión con la base de datos.</p>'+
+      '<p class="text-sm text-slate-700 font-medium mb-2">Entra a esta dirección:</p>'+
+      '<div class="bg-slate-100 rounded-xl p-3 text-sm font-mono break-all mb-4">https://somtechn.github.io/adulam_26/app.html</div>'+
+      '<p class="text-xs text-slate-500">Consejo: agrégala a tu pantalla de inicio para abrirla como app.</p></div>';
+    ri();
+    return;
+  }
+
+  try{
+    var s=loadSession();
+    if(!s){ mostrarLogin(); return; }
+    lm.textContent='Verificando sesión...';
+    if(expirada(s)){
+      if(!s.refresh_token){ clearSession(); mostrarLogin(); return; }
+      lm.textContent='Renovando sesión...';
+      var f=await refrescar(s.refresh_token);
+      if(!f){ clearSession(); mostrarLogin(); return; }
+      s=f;
+    }
+    S.session=s; S.user=s.user;
+    lm.textContent='Cargando perfil...';
+    await cargarPerfil();
+    await entrarApp();
+  }catch(e){
+    console.error(e);
+    clearSession();
+    mostrarLogin();
+    setTimeout(function(){ toast('Sesión reiniciada: '+e.message.slice(0,60),'warning'); },400);
+  }
+})();
+</script>
+</body>
+</html>
