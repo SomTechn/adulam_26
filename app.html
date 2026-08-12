@@ -935,126 +935,221 @@ async function marcarTodos(ok){
 }
 
 /* ---------- SERVICIOS ---------- */
+var SV={ semana:lunesDe(new Date()), plan:null };
+var ROLES_CULTO=[
+  ['dirige_id','Dirige','mic-2'],
+  ['alabanza_id','Alabanza','music'],
+  ['ofrenda_id','Ofrenda','hand-coins'],
+  ['predicador_id','Predicación','book-open'],
+  ['anuncios_id','Anuncios','megaphone']
+];
+function lunesDe(d){ d=new Date(d); var g=(d.getDay()+6)%7; d.setDate(d.getDate()-g); d.setHours(12,0,0,0); return d; }
+function ymd(d){ return d.toISOString().slice(0,10); }
+function addDias(d,n){ var x=new Date(d); x.setDate(x.getDate()+n); return x; }
+function horaTxt(h){ if(!h) return ''; var p=String(h).split(':'); var H=parseInt(p[0]),M=p[1]; var ap=H>=12?'p.m.':'a.m.'; var h12=H%12||12; return h12+':'+M+' '+ap; }
+
 async function view_services(){
   var p=document.getElementById('page');
-  p.innerHTML='<div class="flex flex-wrap gap-2 mb-5 np">'+
-    (puede(['pastor','lider'])?'<button onclick="formPlan()" class="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl flex items-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i>Planificar servicio</button>':'')+
-    (puede(['pastor','lider'])?'<button onclick="gestionTipos()" class="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 rounded-xl font-semibold flex items-center gap-2"><i data-lucide="settings" class="w-4 h-4"></i>Tipos de reunión</button>':'')+
-    '</div><div id="sLista" class="space-y-4"></div>';
-  ri();
-  await cat('members','select=id,nombre&order=nombre');
+  p.innerHTML='<div id="svTop"></div><div id="svCal"></div>';
+  await cat('members','select=id,nombre,foto_url&order=nombre');
   await cat('meeting_types','select=*&activo=is.true&order=orden');
-  await pintarPlanes();
+  await pintarSemana();
 }
-async function pintarPlanes(){
-  var pl=await dbGet('service_plans','select=*,meeting_types(codigo,nombre,icono)&order=fecha.desc&limit=20');
-  var L=document.getElementById('sLista');
-  if(!pl.length){ L.innerHTML=vacio('calendar-days','Sin servicios planificados.'); ri(); return; }
-  var tasks=await dbGet('service_tasks','select=*,members(nombre,foto_url)&order=created_at');
-  var hoyS=hoy();
-  L.innerHTML=pl.map(function(p){
-    var mine=tasks.filter(function(t){return t.service_plan_id===p.id;});
-    var pend=mine.filter(function(t){return t.estado==='pendiente';});
-    var proc=mine.filter(function(t){return t.estado==='en_proceso';});
-    var comp=mine.filter(function(t){return t.estado==='completado';});
-    var mt=p.meeting_types;
-    var pct=mine.length?Math.round(comp.length/mine.length*100):0;
-    var esFuturo=p.fecha>=hoyS, esHoy=p.fecha===hoyS;
-    var sinAsignar=mine.filter(function(t){return !t.responsable_id;}).length;
 
-    function tarjeta(t,color){
-      return '<div class="bg-white border-l-4 border-'+color+'-400 border-y border-r border-slate-200 rounded-lg p-2.5 group">'+
-        '<div class="font-medium text-sm text-slate-800 leading-tight">'+esc(t.nombre_tarea)+'</div>'+
-        '<div class="flex items-center gap-1.5 mt-1.5">'+
-          (t.members
-            ? '<div class="w-5 h-5 rounded-full bg-slate-200 text-slate-600 text-[9px] font-bold flex items-center justify-center overflow-hidden flex-shrink-0">'+
-              (t.members.foto_url?'<img src="'+esc(t.members.foto_url)+'" class="w-full h-full object-cover">':esc(t.members.nombre[0].toUpperCase()))+'</div>'+
-              '<span class="text-xs text-slate-600 truncate">'+esc(t.members.nombre.split(' ')[0])+'</span>'
-            : '<span class="text-xs text-amber-600 flex items-center gap-1"><i data-lucide="user-x" class="w-3 h-3"></i>Sin asignar</span>')+
-        '</div>'+
-        '<div class="flex gap-1 mt-2 np opacity-60 group-hover:opacity-100 transition">'+
-          (t.estado!=='pendiente'?'<button onclick="estadoTarea(\''+t.id+'\',\'pendiente\')" title="Pendiente" class="flex-1 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-600 flex items-center justify-center"><i data-lucide="rotate-ccw" class="w-3 h-3"></i></button>':'')+
-          (t.estado!=='en_proceso'?'<button onclick="estadoTarea(\''+t.id+'\',\'en_proceso\')" title="En proceso" class="flex-1 py-1 bg-amber-100 hover:bg-amber-200 rounded text-amber-700 flex items-center justify-center"><i data-lucide="play" class="w-3 h-3"></i></button>':'')+
-          (t.estado!=='completado'?'<button onclick="estadoTarea(\''+t.id+'\',\'completado\')" title="Listo" class="flex-1 py-1 bg-emerald-100 hover:bg-emerald-200 rounded text-emerald-700 flex items-center justify-center"><i data-lucide="check" class="w-3 h-3"></i></button>':'')+
-          '<button onclick="borrarTarea(\''+t.id+'\')" title="Eliminar" class="py-1 px-1.5 hover:bg-red-100 rounded text-red-500 flex items-center justify-center"><i data-lucide="trash-2" class="w-3 h-3"></i></button>'+
-        '</div></div>';
-    }
-    function col(tit,color,ic,items,pid){
-      return '<div class="flex-1 min-w-[190px] bg-slate-50 rounded-xl p-2.5">'+
-        '<div class="flex items-center gap-1.5 mb-2.5 px-0.5">'+
-        '<span class="w-2 h-2 rounded-full bg-'+color+'-500"></span>'+
-        '<span class="font-semibold text-xs uppercase tracking-wide text-slate-600">'+tit+'</span>'+
-        '<span class="ml-auto text-xs font-bold text-slate-400">'+items.length+'</span></div>'+
-        '<div class="space-y-2">'+(items.length?items.map(function(t){return tarjeta(t,color);}).join('')
-          :'<div class="text-center py-4 text-xs text-slate-300 border-2 border-dashed border-slate-200 rounded-lg">Vacío</div>')+'</div>'+
-        (puede(['admin','pastor','lider','servidor'])?'<button onclick="formTarea(\''+pid+'\',\''+(tit==='Pendiente'?'pendiente':(tit==='En proceso'?'en_proceso':'completado'))+'\')" class="np w-full mt-2 py-1.5 text-xs text-slate-400 hover:text-indigo-600 hover:bg-white rounded-lg transition flex items-center justify-center gap-1"><i data-lucide="plus" class="w-3 h-3"></i>Agregar</button>':'')+
-        '</div>';
-    }
+async function pintarSemana(){
+  var ini=SV.semana, fin=addDias(ini,6);
+  var top=document.getElementById('svTop');
+  var rango=ini.getDate()+' '+MES_L[ini.getMonth()+1].slice(0,3)+' – '+fin.getDate()+' '+MES_L[fin.getMonth()+1].slice(0,3)+' '+fin.getFullYear();
+  top.innerHTML='<div class="flex flex-wrap items-center gap-2 mb-4 np">'+
+    '<div class="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1">'+
+      '<button onclick="svSemana(-1)" class="p-2 hover:bg-slate-100 rounded-lg"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>'+
+      '<button onclick="svHoy()" class="px-3 py-1.5 text-sm font-medium hover:bg-slate-100 rounded-lg">Hoy</button>'+
+      '<button onclick="svSemana(1)" class="p-2 hover:bg-slate-100 rounded-lg"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>'+
+    '</div>'+
+    '<span class="font-semibold text-slate-700 text-sm sm:text-base">'+rango+'</span>'+
+    '<div class="ml-auto flex gap-2">'+
+      '<button onclick="compartirSemana()" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-xl font-medium flex items-center gap-1.5"><i data-lucide="share-2" class="w-4 h-4"></i><span class="hidden sm:inline">Compartir semana</span></button>'+
+      (puede(['admin','pastor','lider'])?'<button onclick="gestionTipos()" class="px-3 py-2 bg-slate-200 hover:bg-slate-300 rounded-xl text-sm font-medium flex items-center gap-1.5"><i data-lucide="settings" class="w-4 h-4"></i><span class="hidden sm:inline">Tipos</span></button>':'')+
+    '</div></div>';
 
-    return '<div class="bg-white rounded-2xl border '+(esHoy?'border-amber-300 ring-2 ring-amber-100':'border-slate-200')+' overflow-hidden">'+
-      '<div class="p-4 sm:p-5 '+(esHoy?'bg-gradient-to-r from-amber-50 to-white':'')+' border-b border-slate-100">'+
-      '<div class="flex items-start gap-3 flex-wrap">'+
-        '<div class="w-14 flex-shrink-0 text-center bg-slate-50 rounded-xl py-2 border border-slate-200">'+
-          '<div class="text-[10px] uppercase font-bold text-slate-400">'+new Date(p.fecha+'T12:00:00').toLocaleDateString('es-HN',{month:'short'})+'</div>'+
-          '<div class="text-2xl font-bold text-slate-800 leading-none">'+new Date(p.fecha+'T12:00:00').getDate()+'</div>'+
-          '<div class="text-[10px] text-slate-500 capitalize">'+new Date(p.fecha+'T12:00:00').toLocaleDateString('es-HN',{weekday:'short'})+'</div>'+
-        '</div>'+
-        '<div class="min-w-0 flex-1"><div class="flex items-center gap-2 flex-wrap">'+
-          '<h4 class="text-base sm:text-lg font-bold text-slate-800">'+esc(mt?mt.icono:'⛪')+' '+esc(mt?mt.nombre:p.tipo_reunion)+'</h4>'+
-          (esHoy?'<span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500 text-white font-bold">HOY</span>':'')+
-          (!esFuturo&&!esHoy?'<span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-semibold">Pasado</span>':'')+
-        '</div>'+
-        (p.tema?'<p class="text-sm text-slate-600 mt-0.5 truncate">'+esc(p.tema)+'</p>':'')+
-        (p.predicador?'<p class="text-xs text-slate-500 flex items-center gap-1 mt-0.5"><i data-lucide="mic" class="w-3 h-3"></i>'+esc(p.predicador)+'</p>':'')+
-        '</div>'+
-        '<div class="flex gap-1 np flex-shrink-0">'+
-          '<button onclick="compartirPlan(\''+p.id+'\')" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium flex items-center gap-1.5"><i data-lucide="share-2" class="w-4 h-4"></i><span class="hidden sm:inline">Compartir</span></button>'+
-          (puede(['admin','pastor','lider','servidor'])?'<button onclick="formTarea(\''+p.id+'\')" class="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm rounded-lg font-medium flex items-center gap-1.5"><i data-lucide="plus" class="w-4 h-4"></i><span class="hidden sm:inline">Tarea</span></button>':'')+
-          (puede(['admin','pastor'])?'<button onclick="borrarPlan(\''+p.id+'\')" class="px-2.5 py-2 bg-slate-100 hover:bg-red-100 text-slate-500 hover:text-red-600 text-sm rounded-lg"><i data-lucide="trash-2" class="w-4 h-4"></i></button>':'')+
-        '</div>'+
+  var c=document.getElementById('svCal');
+  c.innerHTML='<div class="text-center py-10 text-slate-400"><i data-lucide="loader-circle" class="w-7 h-7 mx-auto animate-spin"></i></div>'; ri();
+
+  var planes=await dbGet('v_plan_servicio','fecha=gte.'+ymd(ini)+'&fecha=lte.'+ymd(fin)+'&select=*&order=fecha.asc,hora.asc.nullslast');
+  SV.cache=planes;
+  var dias=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+  var hoyStr=hoy();
+  var h='<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">';
+  for(var i=0;i<7;i++){
+    var d=addDias(ini,i), ds=ymd(d), esHoy=ds===hoyStr;
+    var delDia=planes.filter(function(x){return x.fecha===ds;});
+    h+='<div class="bg-white rounded-2xl border '+(esHoy?'border-amber-300 ring-2 ring-amber-100':'border-slate-200')+' overflow-hidden flex flex-col">'+
+      '<div class="px-3 py-2 '+(esHoy?'bg-amber-50':'bg-slate-50')+' border-b border-slate-100 flex items-center justify-between">'+
+        '<div class="flex items-baseline gap-1.5"><span class="font-bold text-slate-800">'+dias[i]+'</span><span class="text-xs text-slate-400">'+d.getDate()+'</span>'+(esHoy?'<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500 text-white font-bold">HOY</span>':'')+'</div>'+
+        (puede(['admin','pastor','lider'])?'<button onclick="formPlan(null,\''+ds+'\')" class="np p-1 hover:bg-white rounded-lg text-slate-400 hover:text-indigo-600"><i data-lucide="plus" class="w-4 h-4"></i></button>':'')+
       '</div>'+
-      (mine.length?'<div class="mt-4">'+
-        '<div class="flex items-center justify-between text-xs mb-1.5">'+
-        '<span class="text-slate-500">'+comp.length+' de '+mine.length+' tareas listas'+(sinAsignar?' · <span class="text-amber-600 font-medium">'+sinAsignar+' sin responsable</span>':'')+'</span>'+
-        '<span class="font-bold '+(pct===100?'text-emerald-600':'text-slate-600')+'">'+pct+'%</span></div>'+
-        '<div class="h-2 bg-slate-100 rounded-full overflow-hidden"><div class="h-full '+(pct===100?'bg-emerald-500':'bg-indigo-500')+' rounded-full transition-all" style="width:'+pct+'%"></div></div>'+
-      '</div>':'')+
-      '</div>'+
-      '<div class="p-3 sm:p-4 bg-slate-50/50">'+
-      (mine.length||puede(['admin','pastor','lider','servidor'])
-        ? '<div class="flex gap-2.5 overflow-x-auto pb-1">'+col('Pendiente','slate','clock',pend,p.id)+col('En proceso','amber','loader',proc,p.id)+col('Completado','emerald','check',comp,p.id)+'</div>'
-        : '<p class="text-sm text-slate-400 text-center py-3">Sin tareas asignadas.</p>')+
-      '</div></div>';
-  }).join('');
-  ri();
+      '<div class="p-2 space-y-2 flex-1 min-h-[70px]">';
+    if(delDia.length){
+      h+=delDia.map(function(p){
+        var pct=p.n_tareas>0?Math.round(p.n_listas/p.n_tareas*100):0;
+        return '<button onclick="verPlan(\''+p.id+'\')" class="w-full text-left bg-gradient-to-br from-indigo-50 to-violet-50 hover:from-indigo-100 hover:to-violet-100 border border-indigo-100 rounded-xl p-2.5 transition active:scale-[.98]">'+
+          '<div class="flex items-center gap-1.5"><span class="text-lg leading-none">'+esc(p.reunion_icono||'⛪')+'</span>'+
+          '<span class="font-bold text-sm text-slate-800 truncate flex-1">'+esc(p.reunion||p.tipo_reunion)+'</span>'+
+          (p.hora?'<span class="text-[10px] font-semibold text-indigo-600 bg-white px-1.5 py-0.5 rounded">'+horaTxt(p.hora)+'</span>':'')+'</div>'+
+          (p.predica?'<div class="text-xs text-slate-500 mt-1 flex items-center gap-1 truncate"><i data-lucide="mic" class="w-3 h-3 flex-shrink-0"></i>'+esc(p.predica)+'</div>':'')+
+          (p.tema?'<div class="text-xs text-slate-500 italic truncate mt-0.5">'+esc(p.tema)+'</div>':'')+
+          (p.n_tareas>0?'<div class="flex items-center gap-1 mt-1.5"><div class="flex-1 h-1 bg-white rounded-full overflow-hidden"><div class="h-full '+(pct===100?'bg-emerald-500':'bg-indigo-400')+'" style="width:'+pct+'%"></div></div><span class="text-[9px] text-slate-400">'+p.n_listas+'/'+p.n_tareas+'</span></div>':'')+
+          '</button>';
+      }).join('');
+    } else {
+      h+='<button onclick="'+(puede(['admin','pastor','lider'])?'formPlan(null,\''+ds+'\')':'')+'" class="w-full h-full min-h-[54px] flex items-center justify-center text-xs text-slate-300 '+(puede(['admin','pastor','lider'])?'hover:text-indigo-400 hover:bg-slate-50':'')+' rounded-lg transition">'+(puede(['admin','pastor','lider'])?'+ Planificar':'—')+'</button>';
+    }
+    h+='</div></div>';
+  }
+  h+='</div>';
+  c.innerHTML=h; ri();
 }
-function formPlan(){
+function svSemana(n){ SV.semana=addDias(SV.semana,n*7); pintarSemana(); }
+function svHoy(){ SV.semana=lunesDe(new Date()); pintarSemana(); }
+
+/* ---------- Crear / editar plan ---------- */
+async function formPlan(id, fechaIni){
   var tipos=S.cache.meeting_types||[];
-  modal('mS', mHead('Nuevo plan de servicio','mS')+
+  var pl={};
+  if(id){ var d=await dbGet('service_plans','id=eq.'+id+'&select=*'); pl=d[0]||{}; }
+  var mem=S.cache.members||[];
+  var opMem=function(sel){ return '<option value="">— Nadie —</option>'+mem.map(function(m){ return '<option value="'+m.id+'"'+(sel===m.id?' selected':'')+'>'+esc(m.nombre)+'</option>'; }).join(''); };
+  modal('mS', mHead((id?'Editar':'Nuevo')+' plan de servicio','mS')+
    '<form id="fS" class="p-4 space-y-3">'+
-   '<div><label class="text-sm font-medium">Fecha *</label><input name="fecha" type="date" required value="'+hoy()+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
-   '<div><label class="text-sm font-medium">Tipo de reunión *</label><select name="meeting_type_id" required class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg">'+
-     tipos.map(function(t){return '<option value="'+t.id+'">'+esc(t.icono+' '+t.nombre)+'</option>';}).join('')+'</select></div>'+
-   '<div><label class="text-sm font-medium">Tema</label><input name="tema" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
-   '<div><label class="text-sm font-medium">Predicador / Ministrante</label><input name="predicador" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
-   mFoot('mS','Crear')+'</form>');
+   '<div class="grid grid-cols-2 gap-3">'+
+     '<div><label class="text-sm font-medium">Fecha *</label><input name="fecha" type="date" required value="'+(pl.fecha||fechaIni||hoy())+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+     '<div><label class="text-sm font-medium">Hora</label><input name="hora" type="time" value="'+(pl.hora?String(pl.hora).slice(0,5):'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+   '</div>'+
+   '<div><label class="text-sm font-medium">Tipo de reunión *</label><select name="meeting_type_id" required onchange="svAutoHora(this)" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg">'+
+     tipos.map(function(t){return '<option value="'+t.id+'" data-hora="'+(t.hora_default?String(t.hora_default).slice(0,5):'')+'"'+(pl.meeting_type_id===t.id?' selected':'')+'>'+esc(t.icono+' '+t.nombre)+'</option>';}).join('')+'</select></div>'+
+   '<div class="bg-slate-50 rounded-xl p-3 space-y-2.5">'+
+     '<div class="text-xs font-bold text-slate-500 uppercase tracking-wide">Responsables del culto</div>'+
+     '<div><label class="text-xs font-medium text-slate-600">🎤 Dirige</label><select name="dirige_id" class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm">'+opMem(pl.dirige_id)+'</select></div>'+
+     '<div><label class="text-xs font-medium text-slate-600">🎵 Alabanza</label><select name="alabanza_id" class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm">'+opMem(pl.alabanza_id)+'</select></div>'+
+     '<div><label class="text-xs font-medium text-slate-600">💰 Ora por la ofrenda</label><select name="ofrenda_id" class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm">'+opMem(pl.ofrenda_id)+'</select></div>'+
+     '<div class="grid grid-cols-2 gap-2">'+
+       '<div><label class="text-xs font-medium text-slate-600">✨ Tiempo especial 1</label><input name="especial1" value="'+esc(pl.especial1||'')+'" placeholder="Ej: Danza, testimonio" class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm"></div>'+
+       '<div><label class="text-xs font-medium text-slate-600">Responsable</label><select name="especial1_id" class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm">'+opMem(pl.especial1_id)+'</select></div>'+
+     '</div>'+
+     '<div class="grid grid-cols-2 gap-2">'+
+       '<div><label class="text-xs font-medium text-slate-600">✨ Tiempo especial 2</label><input name="especial2" value="'+esc(pl.especial2||'')+'" placeholder="Opcional" class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm"></div>'+
+       '<div><label class="text-xs font-medium text-slate-600">Responsable</label><select name="especial2_id" class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm">'+opMem(pl.especial2_id)+'</select></div>'+
+     '</div>'+
+     '<div><label class="text-xs font-medium text-slate-600">📖 Predicación</label><select name="predicador_id" class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm">'+opMem(pl.predicador_id)+'</select></div>'+
+     '<div><label class="text-xs font-medium text-slate-600">📢 Anuncios</label><select name="anuncios_id" class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm">'+opMem(pl.anuncios_id)+'</select></div>'+
+   '</div>'+
+   '<div><label class="text-sm font-medium">Tema del mensaje (opcional)</label><input name="tema" value="'+esc(pl.tema||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+   '<div><label class="text-sm font-medium">Predicador invitado (si no es miembro)</label><input name="predicador" value="'+esc(pl.predicador||'')+'" placeholder="Nombre externo" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+   '<div><label class="text-sm font-medium">Notas</label><textarea name="notas" rows="2" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg">'+esc(pl.notas||'')+'</textarea></div>'+
+   mFoot('mS',id?'Guardar':'Crear')+'</form>');
   document.getElementById('fS').onsubmit=async function(e){
     e.preventDefault();
     try{
       var fd=new FormData(e.target);
       var tid=fd.get('meeting_type_id');
       var t=(S.cache.meeting_types||[]).filter(function(x){return x.id===tid;})[0];
-      await dbPost('service_plans',{ fecha:fd.get('fecha'), meeting_type_id:tid, tipo_reunion:t?t.codigo:'especial', tema:fd.get('tema')||null, predicador:fd.get('predicador')||null });
-      toast('Plan creado','success'); closeModal('mS'); pintarPlanes();
+      var b={ fecha:fd.get('fecha'), hora:fd.get('hora')||null, meeting_type_id:tid, tipo_reunion:t?t.codigo:'especial',
+        dirige_id:fd.get('dirige_id')||null, alabanza_id:fd.get('alabanza_id')||null, ofrenda_id:fd.get('ofrenda_id')||null,
+        especial1:fd.get('especial1')||null, especial1_id:fd.get('especial1_id')||null,
+        especial2:fd.get('especial2')||null, especial2_id:fd.get('especial2_id')||null,
+        predicador_id:fd.get('predicador_id')||null, anuncios_id:fd.get('anuncios_id')||null,
+        tema:fd.get('tema')||null, predicador:fd.get('predicador')||null, notas:fd.get('notas')||null };
+      if(id) await dbPatch('service_plans','id=eq.'+id,b); else await dbPost('service_plans',b);
+      toast('Plan guardado','success'); closeModal('mS');
+      if(SV.plan===id) verPlan(id); else pintarSemana();
     }catch(err){ toast(err.message.slice(0,120),'error'); }
   };
 }
-function formTarea(planId, estadoIni){
+function svAutoHora(sel){
+  var o=sel.options[sel.selectedIndex], h=o.getAttribute('data-hora');
+  var inp=sel.form.hora; if(h && inp && !inp.value) inp.value=h;
+}
+
+/* ---------- Detalle del plan (orden del culto + tareas) ---------- */
+async function verPlan(id){
+  SV.plan=id;
+  var p=document.getElementById('page');
+  p.innerHTML='<div class="text-center py-10 text-slate-400"><i data-lucide="loader-circle" class="w-7 h-7 mx-auto animate-spin"></i></div>'; ri();
+  var pl=(await dbGet('v_plan_servicio','id=eq.'+id+'&select=*'))[0];
+  if(!pl){ toast('Plan no encontrado','warning'); return volverSemana(); }
+  var tasks=await dbGet('service_tasks','service_plan_id=eq.'+id+'&select=*,members(nombre,foto_url)&order=created_at');
+  var fecha=new Date(pl.fecha+'T12:00:00').toLocaleDateString('es-HN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  var editable=puede(['admin','pastor','lider','servidor']);
+
+  var partes=[];
+  function parte(ic,rol,nombre,extra){ if(nombre||extra) partes.push({ic:ic,rol:rol,quien:nombre,extra:extra}); }
+  parte('mic-2','Dirige',pl.dirige);
+  parte('music','Alabanza',pl.alabanza);
+  parte('hand-coins','Ofrenda',pl.ofrenda);
+  if(pl.especial1||pl.especial1_nombre) parte('sparkles',pl.especial1||'Tiempo especial',pl.especial1_nombre);
+  if(pl.especial2||pl.especial2_nombre) parte('sparkles',pl.especial2||'Tiempo especial',pl.especial2_nombre);
+  parte('book-open','Predicación',pl.predica||pl.predicador,pl.tema);
+  parte('megaphone','Anuncios',pl.anuncios);
+
+  var h='<button onclick="volverSemana()" class="mb-3 text-sm text-slate-500 hover:text-slate-800 flex items-center gap-1 np"><i data-lucide="chevron-left" class="w-4 h-4"></i>Volver a la semana</button>'+
+    '<div class="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-2xl text-white p-5 mb-4">'+
+      '<div class="flex items-start gap-3"><div class="text-4xl">'+esc(pl.reunion_icono||'⛪')+'</div>'+
+      '<div class="flex-1 min-w-0"><h3 class="text-xl font-bold">'+esc(pl.reunion||pl.tipo_reunion)+'</h3>'+
+      '<p class="text-sm text-white/90 capitalize">'+esc(fecha)+(pl.hora?' · '+horaTxt(pl.hora):'')+'</p>'+
+      (pl.tema?'<p class="text-sm text-white/80 italic mt-1">"'+esc(pl.tema)+'"</p>':'')+'</div>'+
+      '<div class="flex flex-col gap-1 np">'+
+        (editable?'<button onclick="formPlan(\''+id+'\')" class="p-2 bg-white/15 hover:bg-white/25 rounded-lg"><i data-lucide="pencil" class="w-4 h-4"></i></button>':'')+
+        (puede(['admin','pastor'])?'<button onclick="borrarPlan(\''+id+'\')" class="p-2 bg-white/15 hover:bg-white/25 rounded-lg"><i data-lucide="trash-2" class="w-4 h-4"></i></button>':'')+
+      '</div></div>'+
+      '<div class="flex gap-2 mt-4 np"><button onclick="compartirPlan(\''+id+'\')" class="flex-1 py-2.5 bg-white/15 hover:bg-white/25 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"><i data-lucide="share-2" class="w-4 h-4"></i>Compartir</button></div>'+
+    '</div>';
+
+  // Orden del culto (roles fijos)
+  h+='<div class="bg-white rounded-2xl border border-slate-200 p-4 mb-4">'+
+    '<h4 class="font-bold text-slate-800 text-sm mb-3 flex items-center gap-1.5"><i data-lucide="list-ordered" class="w-4 h-4"></i>Orden del culto</h4>';
+  if(partes.length){
+    h+='<div class="space-y-1">'+partes.map(function(x,i){
+      return '<div class="flex items-center gap-3 py-2 '+(i<partes.length-1?'border-b border-slate-50':'')+'">'+
+        '<div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0"><i data-lucide="'+x.ic+'" class="w-4 h-4"></i></div>'+
+        '<div class="flex-1 min-w-0"><div class="text-sm font-medium text-slate-800">'+esc(x.rol)+'</div>'+
+        (x.extra?'<div class="text-xs text-slate-400 italic">'+esc(x.extra)+'</div>':'')+'</div>'+
+        '<div class="text-sm '+(x.quien?'text-slate-600':'text-amber-500 italic')+'">'+esc(x.quien||'sin asignar')+'</div></div>';
+    }).join('')+'</div>';
+  } else {
+    h+='<p class="text-sm text-slate-400 text-center py-3">Aún no has asignado responsables. Usa el lápiz de arriba para editarlos.</p>';
+  }
+  h+='</div>';
+
+  // Tareas adicionales (tablero simple)
+  h+='<div class="bg-white rounded-2xl border border-slate-200 p-4">'+
+    '<div class="flex items-center justify-between mb-3"><h4 class="font-bold text-slate-800 text-sm flex items-center gap-1.5"><i data-lucide="clipboard-list" class="w-4 h-4"></i>Otras tareas</h4>'+
+    (editable?'<button onclick="formTarea(\''+id+'\')" class="np px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs rounded-lg font-medium flex items-center gap-1"><i data-lucide="plus" class="w-3.5 h-3.5"></i>Tarea</button>':'')+'</div>';
+  if(tasks.length){
+    h+='<div class="space-y-2">'+tasks.map(function(t){
+      var done=t.estado==='completado';
+      return '<div class="flex items-center gap-3 p-2.5 rounded-xl '+(done?'bg-emerald-50':'bg-slate-50')+' group">'+
+        (editable?'<button onclick="toggleTarea(\''+t.id+'\',\''+t.estado+'\')" class="np w-5 h-5 rounded-md border-2 '+(done?'bg-emerald-500 border-emerald-500 text-white':'border-slate-300 hover:border-indigo-400')+' flex items-center justify-center flex-shrink-0">'+(done?'<i data-lucide="check" class="w-3 h-3"></i>':'')+'</button>':'')+
+        '<div class="flex-1 min-w-0"><div class="text-sm font-medium '+(done?'text-slate-400 line-through':'text-slate-800')+'">'+esc(t.nombre_tarea)+'</div>'+
+        (t.members?'<div class="text-xs text-slate-500">'+esc(t.members.nombre)+'</div>':'<div class="text-xs text-amber-500">Sin asignar</div>')+'</div>'+
+        (editable?'<button onclick="borrarTarea(\''+t.id+'\')" class="np p-1.5 opacity-0 group-hover:opacity-100 hover:bg-red-100 rounded text-red-500"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>':'')+'</div>';
+    }).join('')+'</div>';
+  } else {
+    h+='<p class="text-sm text-slate-400 text-center py-3">Sin tareas extra. Aquí puedes agregar sonido, proyección, ujieres, aseo, etc.</p>';
+  }
+  h+='</div>';
+
+  if(pl.notas) h+='<div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 mt-4"><h4 class="text-xs font-bold text-amber-700 uppercase mb-1">Notas</h4><p class="text-sm text-amber-900 whitespace-pre-wrap">'+esc(pl.notas)+'</p></div>';
+
+  document.getElementById('page').innerHTML=h; ri();
+}
+function volverSemana(){ SV.plan=null; view_services(); }
+
+function formTarea(planId){
   var mem=S.cache.members||[];
   modal('mTa', mHead('Nueva tarea','mTa')+
    '<form id="fTa" class="p-4 space-y-3">'+
-   '<div><label class="text-sm font-medium">Tarea *</label><input name="nombre_tarea" required list="sug" placeholder="Ej: Abrir iglesia, alabanza..." class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg">'+
-   '<datalist id="sug"><option>Abrir iglesia</option><option>Aseo del templo</option><option>Alabanza</option><option>Sonido</option><option>Proyección</option><option>Ujieres</option><option>Ofrenda</option><option>Predicación</option><option>Oración de apertura</option><option>Cierre</option></datalist></div>'+
+   '<div><label class="text-sm font-medium">Tarea *</label><input name="nombre_tarea" required list="sug" placeholder="Ej: Sonido, proyección, ujieres..." class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg">'+
+   '<datalist id="sug"><option>Abrir iglesia</option><option>Aseo del templo</option><option>Sonido</option><option>Proyección</option><option>Ujieres</option><option>Recibimiento</option><option>Café / refrigerio</option><option>Cierre del templo</option></datalist></div>'+
    '<div><label class="text-sm font-medium">Responsable</label><select name="responsable_id" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"><option value="">Sin responsable</option>'+
      mem.map(function(m){return '<option value="'+m.id+'">'+esc(m.nombre)+'</option>';}).join('')+'</select></div>'+
    mFoot('mTa','Agregar')+'</form>');
@@ -1062,39 +1157,47 @@ function formTarea(planId, estadoIni){
     e.preventDefault();
     try{
       var fd=new FormData(e.target);
-      await dbPost('service_tasks',{ service_plan_id:planId, nombre_tarea:fd.get('nombre_tarea'), responsable_id:fd.get('responsable_id')||null, estado:estadoIni||'pendiente' });
-      toast('Tarea agregada','success'); closeModal('mTa'); pintarPlanes();
+      await dbPost('service_tasks',{ service_plan_id:planId, nombre_tarea:fd.get('nombre_tarea'), responsable_id:fd.get('responsable_id')||null, estado:'pendiente' });
+      toast('Tarea agregada','success'); closeModal('mTa'); verPlan(planId);
     }catch(err){ toast(err.message.slice(0,120),'error'); }
   };
 }
-async function estadoTarea(id,est){ try{ await dbPatch('service_tasks','id=eq.'+id,{estado:est}); pintarPlanes(); }catch(e){ toast(e.message.slice(0,120),'error'); } }
-async function borrarTarea(id){ if(!confirm('¿Eliminar tarea?'))return; try{ await dbDel('service_tasks','id=eq.'+id); pintarPlanes(); }catch(e){ toast(e.message.slice(0,120),'error'); } }
-async function borrarPlan(id){ if(!confirm('¿Eliminar el plan y sus tareas?'))return; try{ await dbDel('service_plans','id=eq.'+id); toast('Eliminado','success'); pintarPlanes(); }catch(e){ toast(e.message.slice(0,120),'error'); } }
+async function toggleTarea(id,est){ try{ await dbPatch('service_tasks','id=eq.'+id,{estado:est==='completado'?'pendiente':'completado'}); verPlan(SV.plan); }catch(e){ toast(e.message.slice(0,120),'error'); } }
+async function borrarTarea(id){ if(!confirm('¿Eliminar tarea?'))return; try{ await dbDel('service_tasks','id=eq.'+id); verPlan(SV.plan); }catch(e){ toast(e.message.slice(0,120),'error'); } }
+async function borrarPlan(id){ if(!confirm('¿Eliminar el plan y sus tareas?'))return; try{ await dbDel('service_plans','id=eq.'+id); toast('Eliminado','success'); volverSemana(); }catch(e){ toast(e.message.slice(0,120),'error'); } }
 
+/* ---------- Compartir un plan (texto + flyer) ---------- */
 async function compartirPlan(id){
   try{
-    var p=(await dbGet('service_plans','id=eq.'+id+'&select=*,meeting_types(nombre,icono)'))[0];
+    var p=(await dbGet('v_plan_servicio','id=eq.'+id+'&select=*'))[0];
     var ts=await dbGet('service_tasks','service_plan_id=eq.'+id+'&select=*,members(nombre)&order=created_at');
     var f=new Date(p.fecha+'T12:00:00').toLocaleDateString('es-HN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-    var mt=p.meeting_types;
-    var filas = ts.length ? ts.map(function(t){
-      return '<div class="bg-white/10 rounded-xl p-3 flex items-center justify-between gap-2"><div class="min-w-0"><div class="font-semibold text-white text-sm">'+esc(t.nombre_tarea)+'</div>'+
-        '<div class="text-xs text-white/80">'+esc(t.members?t.members.nombre:'Sin asignar')+'</div></div>'+
-        '<div class="text-lg">'+(t.estado==='completado'?'✓':(t.estado==='en_proceso'?'◐':'○'))+'</div></div>';
-    }).join('') : '<p class="text-white/80 text-center italic text-sm">Sin tareas asignadas</p>';
+    var roles=[]; 
+    if(p.dirige) roles.push(['🎤 Dirige',p.dirige]);
+    if(p.alabanza) roles.push(['🎵 Alabanza',p.alabanza]);
+    if(p.ofrenda) roles.push(['💰 Ofrenda',p.ofrenda]);
+    if(p.especial1||p.especial1_nombre) roles.push(['✨ '+(p.especial1||'Especial'),p.especial1_nombre||'']);
+    if(p.especial2||p.especial2_nombre) roles.push(['✨ '+(p.especial2||'Especial'),p.especial2_nombre||'']);
+    if(p.predica||p.predicador) roles.push(['📖 Predica',p.predica||p.predicador]);
+    if(p.anuncios) roles.push(['📢 Anuncios',p.anuncios]);
 
-    window._compartir = { fecha:f, tipo:(mt?mt.nombre:p.tipo_reunion), tema:p.tema, pred:p.predicador,
-      tareas: ts.map(function(t){ return { n:t.nombre_tarea, r:(t.members?t.members.nombre:null) }; }) };
+    window._compartir = { fecha:f, hora:p.hora?horaTxt(p.hora):'', tipo:(p.reunion||p.tipo_reunion), tema:p.tema,
+      roles:roles, tareas: ts.map(function(t){ return { n:t.nombre_tarea, r:(t.members?t.members.nombre:null) }; }) };
+
+    var filas=roles.map(function(r){
+      return '<div class="bg-white/10 rounded-lg px-3 py-2 flex items-center justify-between gap-2"><span class="text-sm">'+esc(r[0])+'</span><span class="text-sm font-semibold text-right">'+esc(r[1]||'—')+'</span></div>';
+    }).join('');
+    var filasT=ts.length?('<div class="border-t border-white/20 pt-2 mt-2 space-y-1">'+ts.map(function(t){
+      return '<div class="flex items-center justify-between text-xs text-white/90"><span>'+esc(t.nombre_tarea)+'</span><span>'+esc(t.members?t.members.nombre:'—')+'</span></div>';
+    }).join('')+'</div>'):'';
 
     modal('mC','<div id="flyer" class="flyer text-white p-6 sm:p-8">'+
       '<div class="text-center mb-4"><div class="text-xs uppercase tracking-widest opacity-80 mb-1">Iglesia ADULAM</div>'+
-      '<div class="text-4xl mb-2">'+esc(mt?mt.icono:'⛪')+'</div>'+
-      '<h2 class="text-2xl sm:text-3xl font-bold leading-tight">'+esc(mt?mt.nombre:p.tipo_reunion)+'</h2>'+
-      '<p class="text-base mt-1 capitalize">'+esc(f)+'</p></div>'+
+      '<div class="text-4xl mb-2">'+esc(p.reunion_icono||'⛪')+'</div>'+
+      '<h2 class="text-2xl sm:text-3xl font-bold leading-tight">'+esc(p.reunion||p.tipo_reunion)+'</h2>'+
+      '<p class="text-base mt-1 capitalize">'+esc(f)+(p.hora?' · '+horaTxt(p.hora):'')+'</p></div>'+
       (p.tema?'<div class="bg-white/15 rounded-xl p-3 text-center mb-4"><div class="text-xs uppercase opacity-80">Tema</div><div class="text-lg font-semibold">'+esc(p.tema)+'</div></div>':'')+
-      (p.predicador?'<div class="text-center mb-4"><div class="text-xs uppercase opacity-80">Ministra</div><div class="text-base font-semibold">'+esc(p.predicador)+'</div></div>':'')+
-      '<div class="border-t border-white/20 pt-4"><div class="text-xs uppercase tracking-wider opacity-80 mb-3 text-center">Organización</div>'+
-      '<div class="space-y-2">'+filas+'</div></div>'+
+      '<div class="space-y-1.5">'+filas+filasT+'</div>'+
       '<div class="text-center mt-5 text-xs opacity-70">Compartido desde ADULAM</div></div>'+
       '<div class="p-4 flex flex-col sm:flex-row gap-2 bg-slate-100 np">'+
       '<button onclick="descargarFlyer()" class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2"><i data-lucide="download" class="w-4 h-4"></i>Descargar imagen</button>'+
@@ -1104,12 +1207,15 @@ async function compartirPlan(id){
 }
 function copiarTextoPlan(){
   var d=window._compartir; if(!d) return;
-  var t='*IGLESIA ADULAM*\n\n'+d.fecha+'\n'+d.tipo+'\n';
-  if(d.tema) t+='\nTema: *'+d.tema+'*\n';
-  if(d.pred) t+='Ministra: '+d.pred+'\n';
+  var t='*IGLESIA ADULAM*\n\n📅 '+d.fecha+(d.hora?'\n🕐 '+d.hora:'')+'\n'+d.tipo+'\n';
+  if(d.tema) t+='\n📖 Tema: *'+d.tema+'*\n';
   t+='\n*Organización del servicio:*\n';
-  d.tareas.forEach(function(x){ t+='• '+x.n+': '+(x.r||'sin asignar')+'\n'; });
+  d.roles.forEach(function(r){ t+=r[0]+': '+(r[1]||'sin asignar')+'\n'; });
+  if(d.tareas.length){ t+='\n*Otras tareas:*\n'; d.tareas.forEach(function(x){ t+='• '+x.n+': '+(x.r||'sin asignar')+'\n'; }); }
   t+='\n_Bendiciones. ¡Te esperamos!_';
+  copiar(t);
+}
+function copiar(t){
   if(navigator.clipboard) navigator.clipboard.writeText(t).then(function(){ toast('Texto copiado','success'); }).catch(function(){ prompt('Copia manualmente:',t); });
   else prompt('Copia manualmente:',t);
 }
@@ -1124,31 +1230,96 @@ async function descargarFlyer(){
     cv.toBlob(function(b){ var u=URL.createObjectURL(b); var a=document.createElement('a'); a.href=u; a.download='servicio-adulam-'+hoy()+'.png'; a.click(); URL.revokeObjectURL(u); toast('Imagen descargada','success'); });
   }catch(e){ toast('No se pudo generar: '+e.message.slice(0,80),'error'); }
 }
+
+/* ---------- Compartir la SEMANA completa ---------- */
+async function compartirSemana(){
+  var ini=SV.semana, fin=addDias(ini,6);
+  var planes=SV.cache||await dbGet('v_plan_servicio','fecha=gte.'+ymd(ini)+'&fecha=lte.'+ymd(fin)+'&select=*&order=fecha.asc,hora.asc.nullslast');
+  if(!planes.length){ toast('No hay servicios esta semana','warning'); return; }
+  var dias=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  var rango=ini.getDate()+' – '+fin.getDate()+' '+MES_L[fin.getMonth()+1];
+
+  window._semana={ rango:rango, planes:planes };
+  var filas=planes.map(function(p){
+    var d=new Date(p.fecha+'T12:00:00');
+    return '<div class="bg-white/10 rounded-xl p-3 mb-2">'+
+      '<div class="flex items-center gap-2 mb-1"><span class="text-lg">'+esc(p.reunion_icono||'⛪')+'</span>'+
+      '<span class="font-bold text-sm flex-1">'+esc(p.reunion||p.tipo_reunion)+'</span>'+
+      '<span class="text-xs opacity-90 capitalize">'+dias[d.getDay()]+' '+d.getDate()+(p.hora?' · '+horaTxt(p.hora):'')+'</span></div>'+
+      (p.predica||p.dirige?'<div class="text-xs opacity-90">'+(p.predica?'📖 '+esc(p.predica):'')+(p.dirige?(p.predica?' · ':'')+'🎤 '+esc(p.dirige):'')+'</div>':'')+'</div>';
+  }).join('');
+
+  modal('mC','<div id="flyer" class="flyer text-white p-6 sm:p-8">'+
+    '<div class="text-center mb-4"><div class="text-xs uppercase tracking-widest opacity-80 mb-1">Iglesia ADULAM</div>'+
+    '<h2 class="text-2xl font-bold">Servicios de la semana</h2><p class="text-sm mt-1">'+esc(rango)+'</p></div>'+
+    filas+'<div class="text-center mt-4 text-xs opacity-70">Compartido desde ADULAM</div></div>'+
+    '<div class="p-4 flex flex-col sm:flex-row gap-2 bg-slate-100 np">'+
+    '<button onclick="descargarFlyer()" class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2"><i data-lucide="download" class="w-4 h-4"></i>Descargar imagen</button>'+
+    '<button onclick="copiarSemana()" class="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2"><i data-lucide="clipboard" class="w-4 h-4"></i>Copiar texto</button>'+
+    '<button onclick="closeModal(\'mC\')" class="py-3 px-6 bg-slate-300 rounded-xl">Cerrar</button></div>');
+}
+function copiarSemana(){
+  var d=window._semana; if(!d) return;
+  var dias=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  var t='*IGLESIA ADULAM*\n*Servicios de la semana*\n'+d.rango+'\n';
+  d.planes.forEach(function(p){
+    var dd=new Date(p.fecha+'T12:00:00');
+    t+='\n'+esc(p.reunion_icono||'⛪')+' *'+(p.reunion||p.tipo_reunion)+'*\n'+dias[dd.getDay()]+' '+dd.getDate()+(p.hora?' · '+horaTxt(p.hora):'')+'\n';
+    if(p.dirige) t+='🎤 Dirige: '+p.dirige+'\n';
+    if(p.predica||p.predicador) t+='📖 Predica: '+(p.predica||p.predicador)+'\n';
+  });
+  t+='\n_¡Bendiciones para todo el equipo!_';
+  copiar(t);
+}
+
+/* ---------- Tipos de reunión (con hora sugerida) ---------- */
 async function gestionTipos(){
   var ts=await dbGet('meeting_types','select=*&order=orden');
   modal('mTi', mHead('Tipos de reunión','mTi')+'<div class="p-4">'+
+    '<p class="text-xs text-slate-500 mb-3">Las reuniones que tu iglesia realiza. La hora sugerida se autocompleta al planificar.</p>'+
     '<div class="bg-slate-50 rounded-xl mb-4 overflow-hidden">'+ts.map(function(t){
       return '<div class="flex items-center gap-2 p-3 border-b border-slate-100 last:border-0"><span class="text-xl">'+esc(t.icono)+'</span>'+
-        '<div class="flex-1 min-w-0"><div class="font-medium text-sm">'+esc(t.nombre)+'</div><div class="text-xs text-slate-400">'+esc(t.codigo)+'</div></div>'+
-        '<button onclick="borrarTipo(\''+t.id+'\',\''+esc(t.nombre).replace(/'/g,"")+'\')" class="p-1.5 text-red-600 hover:bg-red-100 rounded"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div>';
+        '<div class="flex-1 min-w-0"><div class="font-medium text-sm">'+esc(t.nombre)+'</div><div class="text-xs text-slate-400">'+esc(t.codigo)+(t.hora_default?' · '+horaTxt(t.hora_default):'')+'</div></div>'+
+        '<button onclick="editarTipo(\''+t.id+'\')" class="p-1.5 text-slate-500 hover:bg-slate-200 rounded"><i data-lucide="pencil" class="w-4 h-4"></i></button>'+
+        '<button onclick="borrarTipo(\''+t.id+'\',\''+esc(t.nombre).replace(/\'/g,"")+'\')" class="p-1.5 text-red-600 hover:bg-red-100 rounded"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div>';
     }).join('')+'</div>'+
     '<form id="fTi" class="space-y-2 border-t border-slate-200 pt-4"><h4 class="font-semibold text-sm">Agregar tipo</h4>'+
     '<div class="grid grid-cols-4 gap-2"><input name="icono" placeholder="🎉" maxlength="3" class="px-3 py-2.5 border border-slate-300 rounded-lg text-center text-xl">'+
     '<input name="nombre" required placeholder="Vigilia" class="col-span-3 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
-    '<input name="codigo" required placeholder="codigo_unico" class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm">'+
+    '<div class="grid grid-cols-2 gap-2"><input name="codigo" required placeholder="codigo_unico" class="px-3 py-2.5 border border-slate-300 rounded-lg text-sm">'+
+    '<input name="hora_default" type="time" class="px-3 py-2.5 border border-slate-300 rounded-lg text-sm"></div>'+
     '<button type="submit" class="w-full py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-semibold">Agregar tipo</button></form></div>');
   document.getElementById('fTi').onsubmit=async function(e){
     e.preventDefault();
     try{
       var fd=new FormData(e.target);
       var cod=(fd.get('codigo')||'').toLowerCase().replace(/[^a-z0-9_]/g,'_');
-      await dbPost('meeting_types',{ codigo:cod, nombre:fd.get('nombre'), icono:fd.get('icono')||'⛪', orden:99 });
+      await dbPost('meeting_types',{ codigo:cod, nombre:fd.get('nombre'), icono:fd.get('icono')||'⛪', hora_default:fd.get('hora_default')||null, orden:99 });
       limpiarCache('meeting_types'); await cat('meeting_types','select=*&activo=is.true&order=orden');
       toast('Tipo agregado','success'); gestionTipos();
     }catch(err){ toast(err.message.slice(0,120),'error'); }
   };
 }
-async function borrarTipo(id,n){ if(!confirm('¿Eliminar el tipo "'+n+'"?'))return; try{ await dbDel('meeting_types','id=eq.'+id); limpiarCache('meeting_types'); toast('Eliminado','success'); gestionTipos(); }catch(e){ toast(e.message.slice(0,120),'error'); } }
+async function editarTipo(id){
+  var t=(await dbGet('meeting_types','id=eq.'+id+'&select=*'))[0]; if(!t) return;
+  modal('mTe', mHead('Editar tipo','mTe')+
+   '<form id="fTe" class="p-4 space-y-3">'+
+   '<div class="grid grid-cols-4 gap-2"><input name="icono" value="'+esc(t.icono)+'" maxlength="3" class="px-3 py-2.5 border border-slate-300 rounded-lg text-center text-xl">'+
+   '<input name="nombre" required value="'+esc(t.nombre)+'" class="col-span-3 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+   '<div><label class="text-sm font-medium">Hora sugerida</label><input name="hora_default" type="time" value="'+(t.hora_default?String(t.hora_default).slice(0,5):'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+   '<label class="flex items-center gap-2 text-sm"><input type="checkbox" name="activo" '+(t.activo?'checked':'')+' class="w-4 h-4">Activo</label>'+
+   mFoot('mTe')+'</form>');
+  document.getElementById('fTe').onsubmit=async function(e){
+    e.preventDefault();
+    try{
+      var fd=new FormData(e.target);
+      await dbPatch('meeting_types','id=eq.'+id,{ icono:fd.get('icono')||'⛪', nombre:fd.get('nombre'), hora_default:fd.get('hora_default')||null, activo:!!fd.get('activo') });
+      limpiarCache('meeting_types'); await cat('meeting_types','select=*&activo=is.true&order=orden');
+      toast('Guardado','success'); closeModal('mTe'); gestionTipos();
+    }catch(err){ toast(err.message.slice(0,120),'error'); }
+  };
+}
+async function borrarTipo(id,n){ if(!confirm('¿Eliminar el tipo "'+n+'"?'))return; try{ await dbDel('meeting_types','id=eq.'+id); limpiarCache('meeting_types'); toast('Eliminado','success'); gestionTipos(); }catch(e){ toast('No se pudo: puede tener servicios asociados','error'); } }
 
 /* ---------- CUMPLEAÑOS ---------- */
 var MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
