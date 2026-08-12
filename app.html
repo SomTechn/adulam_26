@@ -781,7 +781,7 @@ function formEquipo(t){
 async function borrarEquipo(id,n){ if(!confirm('¿Eliminar "'+n+'"?'))return; try{ await dbDel('teams','id=eq.'+id); limpiarCache('teams'); toast('Eliminado','success'); pintarEquipos(); }catch(e){ toast(e.message.slice(0,120),'error'); } }
 
 /* ---------- ASISTENCIA ---------- */
-var A = { servicio:null, miembros:[], mapa:{} };
+var A = { servicio:null, serviciosDia:[], miembros:[], mapa:{} };
 async function view_attendance(){
   var p=document.getElementById('page');
   p.innerHTML=
@@ -819,17 +819,34 @@ async function view_attendance(){
 }
 
 async function cargarServiciosDia(){
-  var f=document.getElementById('aFecha').value;
-  var c=document.getElementById('aServicios');
+  var fEl=document.getElementById('aFecha'), c=document.getElementById('aServicios');
+  if(!fEl || !c) return;               // el módulo de asistencia ya no está en pantalla
+  var f=fEl.value;
   if(!f){ c.innerHTML=''; return; }
-  var sv=await dbGet('service_plans','fecha=eq.'+f+'&select=*,meeting_types(nombre,icono)&order=created_at');
+  A.serviciosDia = await dbGet('service_plans','fecha=eq.'+f+'&select=*,meeting_types(nombre,icono)&order=created_at');
+  var sv=A.serviciosDia;
   if(!sv.length){
     c.innerHTML='<div class="bg-amber-50 border border-amber-200 rounded-2xl p-5 text-center">'+
       '<i data-lucide="calendar-off" class="w-10 h-10 mx-auto text-amber-500 mb-2"></i>'+
       '<p class="text-amber-900 mb-3">No hay servicios planificados para esta fecha.</p>'+
       '<button onclick="ir(\'services\')" class="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-semibold"><i data-lucide="plus" class="w-4 h-4"></i>Crear servicio</button></div>';
-    document.getElementById('aPanel').classList.add('hidden'); A.servicio=null; ri(); return;
+    var pn=document.getElementById('aPanel'); if(pn) pn.classList.add('hidden');
+    A.servicio=null; ri(); return;
   }
+  pintarSelectorServicios();
+  // Autoseleccionar si corresponde, sin re-renderizar la lista (evita recursión)
+  if(A.servicio){
+    var vig=sv.filter(function(s){return s.id===A.servicio.id;})[0];
+    if(vig) await elegirServicio(vig.id);
+    else { A.servicio=null; var pn2=document.getElementById('aPanel'); if(pn2) pn2.classList.add('hidden'); }
+  } else if(sv.length===1){
+    await elegirServicio(sv[0].id);
+  }
+}
+
+function pintarSelectorServicios(){
+  var c=document.getElementById('aServicios'); if(!c) return;
+  var sv=A.serviciosDia||[];
   c.innerHTML='<div class="bg-white rounded-2xl border border-slate-200 p-4">'+
     '<div class="text-sm font-medium text-slate-600 mb-3">'+(sv.length===1?'Servicio del día:':sv.length+' servicios — selecciona cuál registrar:')+'</div>'+
     '<div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">'+sv.map(function(s){
@@ -842,17 +859,17 @@ async function cargarServiciosDia(){
     }).join('')+'</div>'+
     '<p class="text-xs text-slate-500 mt-3 flex items-start gap-1"><i data-lucide="info" class="w-3.5 h-3.5 mt-0.5 flex-shrink-0"></i>Un miembro puede asistir a varios servicios el mismo día.</p></div>';
   ri();
-  if(sv.length===1 && !A.servicio) elegirServicio(sv[0].id, sv);
-  else if(A.servicio){ var u=sv.filter(function(s){return s.id===A.servicio.id;})[0]; if(u) elegirServicio(u.id, sv); else { A.servicio=null; document.getElementById('aPanel').classList.add('hidden'); } }
 }
 
-async function elegirServicio(id, lista){
-  if(lista) A.servicio=lista.filter(function(s){return s.id===id;})[0];
-  else A.servicio=(await dbGet('service_plans','id=eq.'+id+'&select=*,meeting_types(nombre,icono)'))[0];
-  await cargarServiciosDia();
+async function elegirServicio(id){
+  var sv=A.serviciosDia||[];
+  A.servicio = sv.filter(function(s){return s.id===id;})[0]
+    || (await dbGet('service_plans','id=eq.'+id+'&select=*,meeting_types(nombre,icono)'))[0];
+  if(!A.servicio){ toast('No se pudo cargar el servicio','error'); return; }
+  pintarSelectorServicios();   // solo actualiza el resaltado, no vuelve a cargar
   var att=await dbGet('attendance','fecha=eq.'+A.servicio.fecha+'&meeting_type_id=eq.'+A.servicio.meeting_type_id+'&select=*');
   A.mapa={}; att.forEach(function(a){ A.mapa[a.member_id]=a; });
-  document.getElementById('aPanel').classList.remove('hidden');
+  var pn=document.getElementById('aPanel'); if(pn) pn.classList.remove('hidden');
   pintarAsistencia();
 }
 
@@ -1392,7 +1409,7 @@ function prTab(e){ PR.estado=e; view_prayers(); }
 async function pintarOraciones(){
   var L=document.getElementById('prLista'); L.innerHTML='<div class="text-center py-8 text-slate-400"><i data-lucide="loader-circle" class="w-6 h-6 mx-auto animate-spin"></i></div>'; ri();
   try{
-    var q='select=*,members(nombre,foto_url)&order=urgente.desc,fecha.desc&limit=200';
+    var q='select=*,members!prayer_requests_member_id_fkey(nombre,foto_url)&order=urgente.desc,fecha.desc&limit=200';
     if(PR.estado) q='estado=eq.'+PR.estado+'&'+q;
     var d=await dbGet('prayer_requests',q);
     if(!d.length){ L.innerHTML=vacio('hand-heart','Sin peticiones en esta vista.'); ri(); return; }
@@ -1452,7 +1469,7 @@ function formOracion(o){
 }
 async function verOracion(id){
   try{
-    var o=(await dbGet('prayer_requests','id=eq.'+id+'&select=*,members(nombre),asignado:members!prayer_requests_asignado_a_fkey(nombre)'))[0];
+    var o=(await dbGet('prayer_requests','id=eq.'+id+'&select=*,members!prayer_requests_member_id_fkey(nombre),asignado:members!prayer_requests_asignado_a_fkey(nombre)'))[0];
     if(!o) return;
     var lg=await dbGet('prayer_log','request_id=eq.'+id+'&select=*,profiles(nombre)&order=created_at.desc&limit=20');
     var c=CAT_ORA[o.categoria]||CAT_ORA.general;
