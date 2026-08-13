@@ -124,6 +124,21 @@ function ri(){ if(window.lucide) lucide.createIcons(); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
 function fecha(f){ if(!f) return '-'; try{ return new Date(f).toLocaleDateString('es-HN',{day:'2-digit',month:'2-digit',year:'numeric'}); }catch(e){return '-';} }
 function dinero(n){ if(n==null) return 'L 0.00'; return 'L '+Number(n).toLocaleString('es-HN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function edadRango(fnac){
+  if(!fnac) return {edad:null,rango:'Sin fecha',color:'slate'};
+  var hoy=new Date(), n=new Date(fnac+'T00:00:00');
+  var e=hoy.getFullYear()-n.getFullYear(), m=hoy.getMonth()-n.getMonth();
+  if(m<0||(m===0&&hoy.getDate()<n.getDate())) e--;
+  if(e<0) return {edad:null,rango:'Sin fecha',color:'slate'};
+  var r,c;
+  if(e<=11){r='Niños';c='sky';}
+  else if(e<=17){r='Adolescentes';c='teal';}
+  else if(e<=29){r='Jóvenes';c='indigo';}
+  else if(e<=39){r='Adultos jóvenes';c='violet';}
+  else if(e<=59){r='Adultos';c='amber';}
+  else{r='Adultos mayores';c='rose';}
+  return {edad:e,rango:r,color:c};
+}
 function hoy(){ return new Date().toISOString().slice(0,10); }
 
 function toast(msg,tipo){
@@ -172,6 +187,11 @@ async function dbPost(tabla, body, prefer){
   var r = await req('/rest/v1/'+tabla, { method:'POST', headers:{ 'Content-Type':'application/json', 'Prefer': prefer||'return=representation' }, body: JSON.stringify(body) });
   if(!r.ok){ var e=await r.text(); throw new Error(e); }
   var t = await r.text(); return t?JSON.parse(t):null;
+}
+async function rpcJson(fn, params){
+  var r = await req('/rest/v1/rpc/'+fn, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(params||{}) });
+  if(!r.ok){ throw new Error(await r.text()); }
+  return r.json();
 }
 async function dbPatch(tabla, query, body){
   var r = await req('/rest/v1/'+tabla+'?'+query, { method:'PATCH', headers:{ 'Content-Type':'application/json', 'Prefer':'return=representation' }, body: JSON.stringify(body) });
@@ -349,7 +369,8 @@ async function view_dashboard(){
      '</div></div>'+
      '<div class="bg-white rounded-2xl border border-slate-200 p-5"><h4 class="font-bold text-slate-800 mb-4 flex items-center gap-2"><i data-lucide="bell" class="w-5 h-5 text-rose-500"></i>Últimas alertas</h4>'+
      '<div id="alertas" class="space-y-2 text-sm"></div></div>'+
-   '</div>';
+   '</div>'+
+   '<div id="analitica" class="grid sm:grid-cols-2 gap-4 mt-4"></div>';
   ri();
 
   try{
@@ -376,6 +397,41 @@ async function view_dashboard(){
   }catch(e){ document.getElementById('alertas').innerHTML='<p class="text-slate-400 text-center py-4">Sin datos.</p>'; }
 
   cargarAvisos();
+  pintarAnalitica();
+}
+
+async function pintarAnalitica(){
+  var cont=document.getElementById('analitica'); if(!cont) return; cont.innerHTML='';
+  function card(tit,ic,inner){ return '<div class="bg-white rounded-2xl border border-slate-200 p-5"><h4 class="font-bold text-slate-800 mb-3 flex items-center gap-2"><i data-lucide="'+ic+'" class="w-5 h-5 text-indigo-500"></i>'+tit+'</h4>'+inner+'</div>'; }
+  function barra(label,val,max,color,extra){ return '<div class="flex items-center gap-3 mb-2"><span class="w-28 shrink-0 text-sm text-slate-600 truncate">'+esc(label)+'</span><div class="flex-1 bg-slate-100 rounded-full h-4 overflow-hidden"><div class="h-4 rounded-full" style="width:'+(max?(val/max*100):0)+'%;background:'+color+'"></div></div><span class="w-20 text-right text-sm font-semibold text-slate-700">'+(extra!=null?extra:val)+'</span></div>'; }
+  var out='';
+  try{
+    var cols={'Niños':'#0ea5e9','Adolescentes':'#14b8a6','Jóvenes':'#6366f1','Adultos jóvenes':'#8b5cf6','Adultos':'#f59e0b','Adultos mayores':'#f43f5e','Sin fecha':'#94a3b8'};
+    var ed=(await rpcJson('stats_edades')).filter(function(d){return d.rango!=='Sin fecha'||d.cantidad>0;});
+    var maxEd=Math.max.apply(null,[1].concat(ed.map(function(d){return Number(d.cantidad);})));
+    out+=card('Rangos de edad','users', ed.length?ed.map(function(d){return barra(d.rango,Number(d.cantidad),maxEd,cols[d.rango]);}).join(''):'<p class="text-sm text-slate-400">Sin datos.</p>');
+  }catch(e){}
+  try{
+    var sv=await rpcJson('stats_asistencia_servicio');
+    var maxSv=Math.max.apply(null,[1].concat(sv.map(function(d){return Number(d.promedio);})));
+    out+=card('Promedio por servicio','clipboard-check', sv.length?sv.map(function(d){return barra(d.servicio,Number(d.promedio),maxSv,'#6366f1',d.promedio+' <span class="text-slate-400 font-normal">(últ '+d.ultimo+')</span>');}).join(''):'<p class="text-sm text-slate-400">Sin asistencia registrada aún.</p>');
+  }catch(e){}
+  try{
+    var di=await rpcJson('stats_asistencia_dia');
+    var maxDi=Math.max.apply(null,[1].concat(di.map(function(d){return Number(d.promedio);})));
+    out+=card('Promedio por día','calendar-days', di.length?di.map(function(d){return barra(d.dia,Number(d.promedio),maxDi,'#8b5cf6',String(d.promedio));}).join(''):'<p class="text-sm text-slate-400">Sin datos.</p>');
+  }catch(e){}
+  if(finAuditor()){
+    try{
+      var of=await rpcJson('stats_ofrenda_asistente');
+      var val=of.filter(function(d){return d.por_asistente!=null;});
+      var inner;
+      if(val.length){ var prom=val.reduce(function(a,d){return a+Number(d.por_asistente);},0)/val.length; inner='<p class="text-3xl font-bold text-slate-800">'+dinero(prom)+'</p><p class="text-sm text-slate-500 mt-1">por asistente · '+val.length+' servicio'+(val.length!==1?'s':'')+'</p>'; }
+      else { inner='<p class="text-sm text-slate-400">Registra asistencia y ofrenda con la misma fecha de servicio para ver esta métrica.</p>'; }
+      out+=card('Ofrenda por asistente','hand-coins', inner);
+    }catch(e){}
+  }
+  cont.innerHTML=out; ri();
 }
 
 async function cargarAvisos(){
@@ -598,6 +654,7 @@ async function borrarMiembro(id,nombre){
 async function perfilMiembro(id){
   try{
     var d=(await dbGet('members','id=eq.'+id+'&select=*,families(nombre_familia),member_teams(teams(nombre)),member_houses(houses(nombre))'))[0];
+    var er=edadRango(d.fecha_nacimiento);
     var att=await dbGet('attendance','member_id=eq.'+id+'&select=*&order=fecha.desc&limit=10');
     var mins=(d.member_teams||[]).map(function(t){return t.teams?t.teams.nombre:null;}).filter(Boolean);
     var cas=(d.member_houses||[]).map(function(h){return h.houses?h.houses.nombre:null;}).filter(Boolean);
@@ -607,11 +664,11 @@ async function perfilMiembro(id){
     modal('mP', mHead('Perfil','mP')+'<div class="p-4">'+
       '<div class="flex items-center gap-4 mb-4"><div class="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-2xl font-bold overflow-hidden">'+
       (d.foto_url?'<img src="'+esc(d.foto_url)+'" class="w-full h-full object-cover">':esc(d.nombre[0].toUpperCase()))+'</div>'+
-      '<div class="min-w-0"><h3 class="text-xl font-bold truncate">'+esc(d.nombre)+'</h3><p class="text-slate-500 text-sm capitalize">'+esc(d.estado_espiritual)+'</p>'+
+      '<div class="min-w-0"><h3 class="text-xl font-bold truncate">'+esc(d.nombre)+'</h3><p class="text-slate-500 text-sm capitalize">'+esc(d.estado_espiritual)+'</p>'+(er.edad!=null?'<span class="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-'+er.color+'-100 text-'+er.color+'-700">'+er.edad+' años · '+er.rango+'</span>':'')+
       (d.telefono?'<p class="text-sm mt-1">'+esc(d.telefono)+'</p>':'')+'</div></div>'+
       '<div class="space-y-2 text-sm bg-slate-50 rounded-xl p-3">'+
       (d.direccion?'<div><b>Dirección:</b> '+esc(d.direccion)+'</div>':'')+
-      (d.families?'<div><b>Familia:</b> '+esc(d.families.nombre_familia)+'</div>':'')+
+      (d.families?'<div><b>Familia:</b> '+esc(d.families.nombre_familia)+'</div>':'')+(d.fecha_nacimiento?'<div><b>Nacimiento:</b> '+fecha(d.fecha_nacimiento)+(er.edad!=null?' · '+er.edad+' años ('+er.rango+')':'')+'</div>':'')+
       (mins.length?'<div><b>Ministerios:</b> '+esc(mins.join(', '))+'</div>':'')+
       (cas.length?'<div><b>Casas de Pan:</b> '+esc(cas.join(', '))+'</div>':'')+
       (d.notas?'<div><b>Notas:</b> '+esc(d.notas)+'</div>':'')+'</div>'+
@@ -1041,7 +1098,7 @@ async function formPlan(id, fechaIni){
        '<div><label class="text-xs font-medium text-slate-600">Responsable</label><select name="especial2_id" class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm">'+opMem(pl.especial2_id)+'</select></div>'+
      '</div>'+
      '<div><label class="text-xs font-medium text-slate-600">📖 Predicación</label><select name="predicador_id" class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm">'+opMem(pl.predicador_id)+'</select></div>'+
-     '<div><label class="text-xs font-medium text-slate-600">📢 Anuncios</label><select name="anuncios_id" class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm">'+opMem(pl.anuncios_id)+'</select></div>'+
+     '<div><label class="text-xs font-medium text-slate-600">📢 Anuncios</label><select name="anuncios_id" class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm">'+opMem(pl.anuncios_id)+'</select></div>'+'<div><label class="text-xs font-medium text-slate-600">📝 Detalle de anuncios</label><textarea name="anuncios_texto" rows="2" placeholder="Ej: Ayuno viernes 6am · Reunión de líderes domingo · Ofrenda de misiones" class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm">'+esc(pl.anuncios_texto||'')+'</textarea></div>'+
    '</div>'+
    '<div><label class="text-sm font-medium">Tema del mensaje (opcional)</label><input name="tema" value="'+esc(pl.tema||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
    '<div><label class="text-sm font-medium">Predicador invitado (si no es miembro)</label><input name="predicador" value="'+esc(pl.predicador||'')+'" placeholder="Nombre externo" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
@@ -1057,7 +1114,7 @@ async function formPlan(id, fechaIni){
         dirige_id:fd.get('dirige_id')||null, alabanza_id:fd.get('alabanza_id')||null, ofrenda_id:fd.get('ofrenda_id')||null,
         especial1:fd.get('especial1')||null, especial1_id:fd.get('especial1_id')||null,
         especial2:fd.get('especial2')||null, especial2_id:fd.get('especial2_id')||null,
-        predicador_id:fd.get('predicador_id')||null, anuncios_id:fd.get('anuncios_id')||null,
+        predicador_id:fd.get('predicador_id')||null, anuncios_id:fd.get('anuncios_id')||null, anuncios_texto:fd.get('anuncios_texto')||null,
         tema:fd.get('tema')||null, predicador:fd.get('predicador')||null, notas:fd.get('notas')||null };
       if(id) await dbPatch('service_plans','id=eq.'+id,b); else await dbPost('service_plans',b);
       toast('Plan guardado','success'); closeModal('mS');
@@ -1089,7 +1146,7 @@ async function verPlan(id){
   if(pl.especial1||pl.especial1_nombre) parte('sparkles',pl.especial1||'Tiempo especial',pl.especial1_nombre);
   if(pl.especial2||pl.especial2_nombre) parte('sparkles',pl.especial2||'Tiempo especial',pl.especial2_nombre);
   parte('book-open','Predicación',pl.predica||pl.predicador,pl.tema);
-  parte('megaphone','Anuncios',pl.anuncios);
+  parte('megaphone','Anuncios',pl.anuncios,pl.anuncios_texto);
 
   var h='<button onclick="volverSemana()" class="mb-3 text-sm text-slate-500 hover:text-slate-800 flex items-center gap-1 np"><i data-lucide="chevron-left" class="w-4 h-4"></i>Volver a la semana</button>'+
     '<div class="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-2xl text-white p-5 mb-4">'+
@@ -1179,7 +1236,7 @@ async function compartirPlan(id){
     if(p.especial1||p.especial1_nombre) roles.push(['✨ '+(p.especial1||'Especial'),p.especial1_nombre||'']);
     if(p.especial2||p.especial2_nombre) roles.push(['✨ '+(p.especial2||'Especial'),p.especial2_nombre||'']);
     if(p.predica||p.predicador) roles.push(['📖 Predica',p.predica||p.predicador]);
-    if(p.anuncios) roles.push(['📢 Anuncios',p.anuncios]);
+    if(p.anuncios||p.anuncios_texto){ var _av=p.anuncios_texto?(p.anuncios_texto+(p.anuncios?' ('+p.anuncios+')':'')):p.anuncios; roles.push(['📢 Anuncios',_av]); }
 
     window._compartir = { fecha:f, hora:p.hora?horaTxt(p.hora):'', tipo:(p.reunion||p.tipo_reunion), tema:p.tema,
       roles:roles, tareas: ts.map(function(t){ return { n:t.nombre_tarea, r:(t.members?t.members.nombre:null) }; }) };
