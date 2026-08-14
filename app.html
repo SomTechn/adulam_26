@@ -140,6 +140,7 @@ function edadRango(fnac){
   return {edad:e,rango:r,color:c};
 }
 function hoy(){ return new Date().toISOString().slice(0,10); }
+function nomShow(m){ if(!m) return ''; var d=m.nombre_display; return (d&&(''+d).trim())?(''+d).trim():(m.nombre||''); }
 
 function toast(msg,tipo){
   var c={success:'bg-emerald-600',error:'bg-red-600',info:'bg-slate-800',warning:'bg-amber-600'};
@@ -564,6 +565,7 @@ function formMiembro(m){
   var html = mHead((m.id?'Editar':'Nuevo')+' miembro','mM')+
    '<form id="fM" class="p-4 space-y-4">'+
    '<div><label class="text-sm font-medium text-slate-700">Nombre completo *</label><input name="nombre" required value="'+esc(m.nombre||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+   '<div><label class="text-sm font-medium text-slate-700">Nombre para mostrar <span class="text-xs text-slate-400 font-normal">(opcional · en servicios, asistencia, etc.)</span></label><input name="nombre_display" value="'+esc(m.nombre_display||'')+'" placeholder="Ej: Marito, Hna. Rosa, Pastor Juan" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
    '<div class="grid grid-cols-2 gap-3">'+
      '<div><label class="text-sm font-medium text-slate-700">Teléfono</label><input name="telefono" inputmode="tel" value="'+esc(m.telefono||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
      '<div><label class="text-sm font-medium text-slate-700">Nacimiento</label><input name="fecha_nacimiento" type="date" value="'+esc(m.fecha_nacimiento||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
@@ -620,7 +622,7 @@ function formMiembro(m){
     btn.disabled=true; btn.textContent='Guardando...';
     try{
       var fd=new FormData(e.target);
-      var body={ nombre:fd.get('nombre'), telefono:fd.get('telefono')||null, direccion:fd.get('direccion')||null,
+      var body={ nombre:fd.get('nombre'), nombre_display:(fd.get('nombre_display')||'').trim()||null, telefono:fd.get('telefono')||null, direccion:fd.get('direccion')||null,
         familia_id:fd.get('familia_id')||null,
         etapa:fd.get('etapa')||'nuevo', situacion:fd.get('situacion')||'activo', es_lider:!!fd.get('es_lider'),
         genero:fd.get('genero')||null, fecha_bautismo:fd.get('fecha_bautismo')||null,
@@ -745,7 +747,7 @@ async function view_houses(){
     '<p class="text-sm text-amber-900">Grupos pequeños que se reúnen en hogares. Un miembro puede pertenecer a varias.</p></div>'+
     (puede(['pastor','lider','servidor'])?'<div class="mb-5"><button onclick="formCasa()" class="px-5 py-3 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl flex items-center gap-2"><i data-lucide="plus" class="w-5 h-5"></i>Nueva Casa de Pan</button></div>':'')+
     '<div id="hGrid" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>';
-  ri(); await cat('members','select=id,nombre&order=nombre'); await pintarCasas();
+  ri(); await cat('members','select=id,nombre,nombre_display&order=nombre'); await pintarCasas();
 }
 async function pintarCasas(){
   var hs=await dbGet('houses','select=*,members!houses_anfitrion_id_fkey(nombre)&order=nombre');
@@ -788,6 +790,7 @@ function formCasa(h){
        '<input name="lat" inputmode="decimal" value="'+esc(h.lat!=null?String(h.lat):'')+'" placeholder="Latitud" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">'+
        '<input name="lng" inputmode="decimal" value="'+esc(h.lng!=null?String(h.lng):'')+'" placeholder="Longitud" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">'+
      '</div>'+
+     '<div class="mt-2"><label class="text-xs font-medium text-slate-600">Radio de alcance (km)</label><input name="radio_km" type="number" step="0.1" min="0" value="'+(h.radio_km!=null?h.radio_km:'1')+'" class="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg text-sm"><p class="text-[11px] text-slate-400 mt-1">\u00c1rea de cobertura que se dibuja en el mapa. Por defecto 1 km.</p></div>'+
    '</div>'+
    '<div class="grid grid-cols-2 gap-3">'+
      '<div><label class="text-sm font-medium">Día</label><select name="dia_reunion" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"><option value="">—</option>'+
@@ -800,7 +803,7 @@ function formCasa(h){
     e.preventDefault();
     try{
       var fd=new FormData(e.target);
-      var b={nombre:fd.get('nombre'),anfitrion_id:fd.get('anfitrion_id')||null,direccion:fd.get('direccion')||null,dia_reunion:fd.get('dia_reunion')||null,hora:fd.get('hora')||null,descripcion:fd.get('descripcion')||null,lat:parseFloat(fd.get('lat'))||null,lng:parseFloat(fd.get('lng'))||null};
+      var b={nombre:fd.get('nombre'),anfitrion_id:fd.get('anfitrion_id')||null,direccion:fd.get('direccion')||null,dia_reunion:fd.get('dia_reunion')||null,hora:fd.get('hora')||null,descripcion:fd.get('descripcion')||null,lat:parseFloat(fd.get('lat'))||null,lng:parseFloat(fd.get('lng'))||null,radio_km:parseFloat(fd.get('radio_km'))||1};
       if(h.id) await dbPatch('houses','id=eq.'+h.id,b); else await dbPost('houses',b);
       limpiarCache('houses'); toast('Guardado','success'); closeModal('mH'); pintarCasas();
     }catch(err){ toast(err.message.slice(0,120),'error'); }
@@ -813,7 +816,7 @@ async function view_teams(){
   var p=document.getElementById('page');
   p.innerHTML=(puede(['pastor','lider'])?'<div class="mb-5"><button onclick="formEquipo()" class="px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl flex items-center gap-2"><i data-lucide="plus" class="w-5 h-5"></i>Nuevo ministerio</button></div>':'')+
     '<div id="tGrid" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>';
-  ri(); await cat('members','select=id,nombre&order=nombre'); await pintarEquipos();
+  ri(); await cat('members','select=id,nombre,nombre_display&order=nombre'); await pintarEquipos();
 }
 async function pintarEquipos(){
   var ts=await dbGet('teams','select=*,members!teams_lider_fk(nombre)&order=nombre');
@@ -887,7 +890,7 @@ async function view_attendance(){
   fams.forEach(function(f){ document.getElementById('aFam').innerHTML+='<option value="'+f.id+'">'+esc(f.nombre_familia)+'</option>'; });
   casas.forEach(function(c){ document.getElementById('aCasa').innerHTML+='<option value="'+c.id+'">'+esc(c.nombre)+'</option>'; });
 
-  A.miembros = await dbGet('members','select=id,nombre,foto_url,familia_id,families(nombre_familia),member_houses(house_id)&estado_espiritual=neq.inactivo&order=nombre');
+  A.miembros = await dbGet('members','select=id,nombre,nombre_display,foto_url,familia_id,families(nombre_familia),member_houses(house_id)&estado_espiritual=neq.inactivo&order=nombre');
 
   document.getElementById('aFecha').onchange=cargarServiciosDia;
   document.getElementById('aBuscar').oninput=pintarAsistencia;
@@ -983,8 +986,8 @@ function pintarAsistencia(){
       var a=A.mapa[m.id], ok=a?a.asistio:false;
       return '<label class="bg-white rounded-xl border p-3 flex items-center gap-3 cursor-pointer hover:bg-slate-50 transition '+(ok?'border-emerald-300 bg-emerald-50':'border-slate-200')+'">'+
         '<div class="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold overflow-hidden flex-shrink-0">'+
-        (m.foto_url?'<img src="'+esc(m.foto_url)+'" class="w-full h-full object-cover">':esc(m.nombre[0].toUpperCase()))+'</div>'+
-        '<div class="flex-1 min-w-0"><div class="font-medium text-slate-800 truncate">'+esc(m.nombre)+'</div>'+
+        (m.foto_url?'<img src="'+esc(m.foto_url)+'" class="w-full h-full object-cover">':esc(nomShow(m)[0].toUpperCase()))+'</div>'+
+        '<div class="flex-1 min-w-0"><div class="font-medium text-slate-800 truncate">'+esc(nomShow(m))+'</div>'+
         (m.families?'<div class="text-xs text-slate-500 truncate">'+esc(m.families.nombre_familia)+'</div>':'')+'</div>'+
         '<input type="checkbox" '+(ok?'checked':'')+' onchange="marcarUno(\''+m.id+'\',this.checked)" class="w-6 h-6 accent-emerald-600 flex-shrink-0"></label>';
     }).join('');
@@ -1029,7 +1032,7 @@ function horaTxt(h){ if(!h) return ''; var p=String(h).split(':'); var H=parseIn
 async function view_services(){
   var p=document.getElementById('page');
   p.innerHTML='<div id="svTop"></div><div id="svCal"></div>';
-  await cat('members','select=id,nombre,foto_url&order=nombre');
+  await cat('members','select=id,nombre,nombre_display,foto_url&order=nombre');
   await cat('meeting_types','select=*&activo=is.true&order=orden');
   await pintarSemana();
 }
@@ -1096,7 +1099,7 @@ async function formPlan(id, fechaIni){
   var pl={};
   if(id){ var d=await dbGet('service_plans','id=eq.'+id+'&select=*'); pl=d[0]||{}; }
   var mem=S.cache.members||[];
-  var opMem=function(sel){ return '<option value="">— Nadie —</option>'+mem.map(function(m){ return '<option value="'+m.id+'"'+(sel===m.id?' selected':'')+'>'+esc(m.nombre)+'</option>'; }).join(''); };
+  var opMem=function(sel){ return '<option value="">— Nadie —</option>'+mem.map(function(m){ return '<option value="'+m.id+'"'+(sel===m.id?' selected':'')+'>'+esc(nomShow(m))+'</option>'; }).join(''); };
   modal('mS', mHead((id?'Editar':'Nuevo')+' plan de servicio','mS')+
    '<form id="fS" class="p-4 space-y-3">'+
    '<div class="grid grid-cols-2 gap-3">'+
@@ -1480,7 +1483,7 @@ async function view_visitors(){
     '<select id="vsFiltro" onchange="VS.estado=this.value;pintarVisitas()" class="px-3 py-2.5 border border-slate-300 rounded-xl text-sm"><option value="">Todas</option>'+
       Object.keys(EST_VIS).map(function(k){ return '<option value="'+k+'">'+EST_VIS[k][0]+'</option>'; }).join('')+'</select>'+
     '</div><div id="vsLista"></div>';
-  ri(); await cat('members','select=id,nombre&order=nombre'); await cat('meeting_types','select=*&activo=is.true&order=orden'); await pintarVisitas();
+  ri(); await cat('members','select=id,nombre,nombre_display&order=nombre'); await cat('meeting_types','select=*&activo=is.true&order=orden'); await pintarVisitas();
 }
 async function pintarVisitas(){
   var L=document.getElementById('vsLista'); L.innerHTML='<div class="text-center py-8 text-slate-400"><i data-lucide="loader-circle" class="w-6 h-6 mx-auto animate-spin"></i></div>'; ri();
@@ -1654,7 +1657,7 @@ async function view_prayers(){
     '<div class="flex gap-1 bg-slate-100 rounded-xl p-1 mb-4 overflow-x-auto">'+tabs.map(function(t){
       return '<button onclick="prTab(\''+t[0]+'\')" id="prT'+(t[0]||'all')+'" class="flex-1 py-2 px-3 rounded-lg text-sm font-semibold whitespace-nowrap transition '+(PR.estado===t[0]?'bg-white text-violet-700 shadow-sm':'text-slate-500')+'">'+t[1]+'</button>';
     }).join('')+'</div><div id="prLista"></div>';
-  ri(); await cat('members','select=id,nombre&order=nombre'); await pintarOraciones();
+  ri(); await cat('members','select=id,nombre,nombre_display&order=nombre'); await pintarOraciones();
 }
 function prTab(e){ PR.estado=e; view_prayers(); }
 
@@ -1822,7 +1825,7 @@ async function pintarUsuarios(){
 async function cambiarRol(uid){
   var us=(await dbGet('v_usuarios','id=eq.'+uid+'&select=*'))[0];
   if(!us) return;
-  var mem=await cat('members','select=id,nombre,user_id&order=nombre');
+  var mem=await cat('members','select=id,nombre,nombre_display,user_id&order=nombre');
   modal('mUs', mHead('Permisos de '+esc(us.nombre.split(' ')[0]),'mUs')+
    '<form id="fUs" class="p-4 space-y-3">'+
    '<div class="bg-slate-50 rounded-xl p-3 text-sm"><div class="font-semibold text-slate-800">'+esc(us.nombre)+'</div><div class="text-slate-500 text-xs">'+esc(us.email||'')+'</div></div>'+
@@ -2020,11 +2023,11 @@ async function pintarDecisiones(){
   ri();
 }
 async function formDecision(id){
-  var mem=(S.cache.members&&S.cache.members.length)?S.cache.members:await dbGet('members','select=id,nombre&order=nombre');
+  var mem=(S.cache.members&&S.cache.members.length)?S.cache.members:await dbGet('members','select=id,nombre,nombre_display&order=nombre');
   var tipos=(S.cache.meeting_types&&S.cache.meeting_types.length)?S.cache.meeting_types:await dbGet('meeting_types','select=id,nombre,icono&activo=eq.true&order=orden');
   var d={};
   if(id){ d=(await dbGet('decisiones','id=eq.'+id+'&select=*'))[0]||{}; }
-  var opMem='<option value="">\u2014 No es miembro / externo \u2014</option>'+mem.map(function(m){return '<option value="'+m.id+'"'+(d.member_id===m.id?' selected':'')+'>'+esc(m.nombre)+'</option>';}).join('');
+  var opMem='<option value="">\u2014 No es miembro / externo \u2014</option>'+mem.map(function(m){return '<option value="'+m.id+'"'+(d.member_id===m.id?' selected':'')+'>'+esc(nomShow(m))+'</option>';}).join('');
   var opTipo=Object.keys(DEC_TIPOS).map(function(k){return '<option value="'+k+'"'+((d.tipo||'acepto')===k?' selected':'')+'>'+DEC_TIPOS[k][0]+'</option>';}).join('');
   var opCulto='<option value="">\u2014</option>'+tipos.map(function(tp){return '<option value="'+tp.id+'"'+(d.meeting_type_id===tp.id?' selected':'')+'>'+esc(tp.icono+' '+tp.nombre)+'</option>';}).join('');
   modal('mD', mHead((id?'Editar':'Registrar')+' decisi\u00f3n','mD')+
@@ -2090,8 +2093,8 @@ async function view_mapa(){
       iconUrl:'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
       shadowUrl:'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
     });
-    var mem=await dbGet('members','select=id,nombre,lat,lng,telefono,estado_espiritual&lat=not.is.null&lng=not.is.null&situacion=eq.activo');
-    var casas=await dbGet('houses','select=id,nombre,lat,lng,direccion&lat=not.is.null&lng=not.is.null');
+    var mem=await dbGet('members','select=id,nombre,nombre_display,lat,lng,telefono,estado_espiritual&lat=not.is.null&lng=not.is.null&situacion=eq.activo');
+    var casas=await dbGet('houses','select=id,nombre,lat,lng,direccion,radio_km&lat=not.is.null&lng=not.is.null');
     p.innerHTML='<div class="mb-3"><h3 class="text-xl font-bold text-slate-800">Mapa de la congregación</h3>'+
       '<p class="text-sm text-slate-500">'+mem.length+' miembro'+(mem.length!==1?'s':'')+' \u00b7 '+casas.length+' Casa'+(casas.length!==1?'s':'')+' de Pan ubicada'+(casas.length!==1?'s':'')+'</p></div>'+
       ((mem.length||casas.length)?'':'<div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-3 text-sm text-amber-800"><b>Aún no hay ubicaciones.</b> Abre la ficha de un miembro o una Casa de Pan, pulsa \u201cUsar mi ubicación\u201d estando en el lugar (o pega coordenadas de Google Maps) y guarda. Aquí se irán dibujando en el mapa.</div>')+
@@ -2101,25 +2104,29 @@ async function view_mapa(){
     var map=L.map('leafletMap').setView([15.60,-87.95], 13); /* López Arellano aprox. */
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ maxZoom:19, attribution:'\u00a9 OpenStreetMap' }).addTo(map);
     MAPA.instance=map;
+    var memIcon=L.divIcon({ className:'', html:'<div style="background:#eab308;width:26px;height:26px;border-radius:50%;border:3px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.4)"></div>', iconSize:[26,26], iconAnchor:[13,13] });
+    var casaIcon=L.divIcon({ className:'', html:'<div style="background:#2563eb;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.4)">\ud83c\udf3e</div>', iconSize:[32,32], iconAnchor:[16,16] });
     var pts=[];
     mem.forEach(function(m){
       var la=Number(m.lat), ln=Number(m.lng);
       if(isNaN(la)||isNaN(ln)) return;
-      var wa=m.telefono?'<br><a href="'+waLink(m.telefono,'\u00a1Hola '+m.nombre.split(' ')[0]+'! Dios te bendiga. \ud83d\ude4f')+'" target="_blank" style="color:#059669;font-weight:600">WhatsApp</a>':'';
-      L.marker([la,ln]).addTo(map).bindPopup('<b>'+esc(m.nombre)+'</b>'+(m.estado_espiritual?'<br><span style="color:#64748b;text-transform:capitalize">'+esc(m.estado_espiritual)+'</span>':'')+wa);
+      var nm=nomShow(m);
+      var wa=m.telefono?'<br><a href="'+waLink(m.telefono,'\u00a1Hola '+nm.split(' ')[0]+'! Dios te bendiga. \ud83d\ude4f')+'" target="_blank" style="color:#059669;font-weight:600">WhatsApp</a>':'';
+      L.marker([la,ln],{ icon:memIcon }).addTo(map).bindPopup('<b>'+esc(nm)+'</b>'+(m.estado_espiritual?'<br><span style="color:#64748b;text-transform:capitalize">'+esc(m.estado_espiritual)+'</span>':'')+wa);
       pts.push([la,ln]);
     });
-    var casaIcon=L.divIcon({ className:'', html:'<div style="background:#f59e0b;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)">\ud83c\udf3e</div>', iconSize:[30,30], iconAnchor:[15,15] });
     casas.forEach(function(c){
       var la=Number(c.lat), ln=Number(c.lng);
       if(isNaN(la)||isNaN(ln)) return;
-      L.marker([la,ln],{ icon:casaIcon }).addTo(map).bindPopup('<b>\ud83c\udf3e '+esc(c.nombre)+'</b>'+(c.direccion?'<br><span style="color:#64748b">'+esc(c.direccion)+'</span>':''));
-      pts.push([la,ln]);
+      var rkm=(c.radio_km!=null && !isNaN(Number(c.radio_km)))?Number(c.radio_km):1;
+      var circ=L.circle([la,ln],{ radius:rkm*1000, color:'#2563eb', weight:1, fillColor:'#3b82f6', fillOpacity:0.10 }).addTo(map);
+      L.marker([la,ln],{ icon:casaIcon }).addTo(map).bindPopup('<b>\ud83c\udf3e '+esc(c.nombre)+'</b>'+(c.direccion?'<br><span style="color:#64748b">'+esc(c.direccion)+'</span>':'')+'<br><span style="color:#2563eb;font-weight:600">Radio: '+rkm+' km</span>');
+      try{ var cb=circ.getBounds(); pts.push([cb.getNorth(),cb.getEast()],[cb.getSouth(),cb.getWest()]); }catch(e){ pts.push([la,ln]); }
     });
-    if(pts.length){ try{ map.fitBounds(pts,{ padding:[40,40], maxZoom:16 }); }catch(e){} }
+    if(pts.length){ try{ map.fitBounds(pts,{ padding:[30,30], maxZoom:16 }); }catch(e){} }
     if(mem.length||casas.length){
       var leyenda=L.control({position:'bottomleft'});
-      leyenda.onAdd=function(){ var div=L.DomUtil.create('div'); div.style.cssText='background:#fff;padding:6px 10px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.2);font:12px sans-serif;line-height:1.5'; div.innerHTML='<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px"><span style="width:12px;height:12px;background:#3b82f6;border-radius:50%;display:inline-block"></span>Miembros</div><div style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;background:#f59e0b;border-radius:50%;display:inline-block"></span>Casas de Pan</div>'; return div; };
+      leyenda.onAdd=function(){ var div=L.DomUtil.create('div'); div.style.cssText='background:#fff;padding:6px 10px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.2);font:12px sans-serif;line-height:1.5'; div.innerHTML='<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px"><span style="width:12px;height:12px;background:#eab308;border-radius:50%;display:inline-block"></span>Miembros</div><div style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;background:#2563eb;border-radius:50%;display:inline-block"></span>Casas de Pan</div>'; return div; };
       leyenda.addTo(map);
     }
     setTimeout(function(){ try{ map.invalidateSize(); }catch(e){} }, 220);
@@ -2179,11 +2186,11 @@ async function pintarPastoral(){
   }catch(e){ document.getElementById('ipList').innerHTML='<div class="text-sm text-red-600 p-3">'+esc(e.message.slice(0,150))+'</div>'; }
 }
 async function formIngresoPastoral(id){
-  var mem=(S.cache.members&&S.cache.members.length)?S.cache.members:await dbGet('members','select=id,nombre&order=nombre');
+  var mem=(S.cache.members&&S.cache.members.length)?S.cache.members:await dbGet('members','select=id,nombre,nombre_display&order=nombre');
   var d={};
   if(id){ d=(await dbGet('ingresos_pastorales','id=eq.'+id+'&select=*'))[0]||{}; }
   var opTipo=Object.keys(IP_TIPOS).map(function(k){return '<option value="'+k+'"'+((d.tipo||'diezmo')===k?' selected':'')+'>'+IP_TIPOS[k][0]+'</option>';}).join('');
-  var opMem='<option value="">— No es miembro / externo —</option>'+mem.map(function(m){return '<option value="'+m.id+'"'+(d.member_id===m.id?' selected':'')+'>'+esc(m.nombre)+'</option>';}).join('');
+  var opMem='<option value="">— No es miembro / externo —</option>'+mem.map(function(m){return '<option value="'+m.id+'"'+(d.member_id===m.id?' selected':'')+'>'+esc(nomShow(m))+'</option>';}).join('');
   modal('mIP', mHead((id?'Editar':'Nuevo')+' ingreso pastoral','mIP')+
     '<form id="fIP" class="p-4 space-y-3">'+
     '<div class="grid grid-cols-2 gap-3">'+
@@ -2366,14 +2373,14 @@ function render_stats(mem, etapas, crec, asis, vis, casas, finMes, finCat, dec, 
         return '<div class="flex items-center gap-3 py-2 border-b border-slate-50 last:border-0">'+
           '<div class="w-9 h-9 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center flex-shrink-0"><i data-lucide="user-minus" class="w-4 h-4"></i></div>'+
           '<div class="flex-1 min-w-0"><div class="text-sm font-medium text-slate-800 truncate">'+esc(r.nombre)+'</div>'+
-          '<div class="text-xs text-slate-500">'+r.dias+' d\u00edas sin asistir \u00b7 \u00falt. '+fecha(r.ultima)+'</div></div>'+
+          '<div class="text-xs text-slate-500">Sin asistir a los \u00faltimos 3 servicios \u00b7 \u00falt. asist. '+fecha(r.ultima)+'</div></div>'+
           (r.telefono?'<a href="'+waLink(r.telefono,'\u00a1Hola '+r.nombre.split(' ')[0]+'! Te extra\u00f1amos en la iglesia. \u00bfC\u00f3mo est\u00e1s? Queremos saber de ti. \ud83d\ude4f')+'" target="_blank" class="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg flex-shrink-0"><i data-lucide="message-circle" class="w-5 h-5"></i></a>':'')+'</div>';
       }).join('');
       h+='<div class="mb-4">'+card('Miembros en riesgo','user-minus',
-        '<p class="text-xs text-slate-500 mb-2">'+riesgo.length+' miembro'+(riesgo.length!==1?'s activos':' activo')+' sin asistir hace m\u00e1s de 3 semanas. Un toque para escribirles.</p>'+
+        '<p class="text-xs text-slate-500 mb-2">'+riesgo.length+' miembro'+(riesgo.length!==1?'s':'')+' sin asistir a los \u00faltimos 3 servicios seguidos. Un toque para escribirles.</p>'+
         '<div>'+listaR+'</div>'+(riesgo.length>15?'<p class="text-xs text-slate-400 mt-2 text-center">y '+(riesgo.length-15)+' m\u00e1s</p>':''))+'</div>';
     } else {
-      h+='<div class="mb-4">'+card('Miembros en riesgo','user-check',chartEmpty('user-check','Aqu\u00ed aparecer\u00e1n los miembros que dejaron de asistir por m\u00e1s de 3 semanas, con un bot\u00f3n para contactarlos. Se activa a medida que registras asistencia.'))+'</div>';
+      h+='<div class="mb-4">'+card('Miembros en riesgo','user-check',chartEmpty('user-check','Aqu\u00ed aparecer\u00e1n los miembros que faltaron a los 3 servicios m\u00e1s recientes seguidos, con un bot\u00f3n para contactarlos. Se activa a medida que registras asistencia.'))+'</div>';
     }
   }
 
@@ -3091,7 +3098,7 @@ async function pintarRecibos(){
   }catch(e){ b.innerHTML='<div class="text-sm text-red-600 p-3">'+esc(e.message.slice(0,150))+'</div>'; }
 }
 async function formRecibo(){
-  var mem=await cat('members','select=id,nombre&order=nombre');
+  var mem=await cat('members','select=id,nombre,nombre_display&order=nombre');
   var r=await req('/rest/v1/rpc/siguiente_recibo',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({p_anio:FZ.anio}) });
   var num=r.ok?await r.json():1;
   modal('mRe', mHead('Emitir recibo Nº '+num,'mRe')+
@@ -3417,7 +3424,7 @@ async function borrarLeccion(id,cid){ if(!confirm('¿Eliminar esta lección?'))r
 
 async function formPromo(cid,o){
   o=o||{};
-  var mem=await cat('members','select=id,nombre&order=nombre');
+  var mem=await cat('members','select=id,nombre,nombre_display&order=nombre');
   modal('mPr', mHead((o.id?'Editar':'Nueva')+' promoción','mPr')+
    '<form id="fPr" class="p-4 space-y-3">'+
    '<div><label class="text-sm font-medium">Nombre *</label><input name="nombre" required placeholder="Ej: Enero 2026" value="'+esc(o.nombre||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
@@ -3493,7 +3500,7 @@ async function borrarPromo(id,cid){ if(!confirm('¿Eliminar esta promoción?'))r
 async function agregarParticipantes(cid){
   var ex=await dbGet('discipleship_participants','cohort_id=eq.'+cid+'&select=member_id');
   var ya={}; ex.forEach(function(e){ ya[e.member_id]=1; });
-  var mem=await cat('members','select=id,nombre&order=nombre');
+  var mem=await cat('members','select=id,nombre,nombre_display&order=nombre');
   var disp=mem.filter(function(m){ return !ya[m.id]; });
   if(!disp.length){ toast('Todos los miembros ya están inscritos','info'); return; }
   modal('mAP', mHead('Agregar participantes','mAP')+'<div class="p-4">'+
@@ -3575,7 +3582,7 @@ async function view_social(){
     ['pendiente','en_diseno','aprobado','publicado'].map(function(x){return '<option value="'+x+'">'+x.replace('_',' ')+'</option>';}).join('')+'</select>'+
     (puede(['pastor','lider','servidor'])?'<button onclick="formPost()" class="sm:ml-auto px-5 py-2.5 bg-pink-600 hover:bg-pink-700 text-white font-semibold rounded-xl flex items-center justify-center gap-2"><i data-lucide="plus" class="w-5 h-5"></i>Nuevo contenido</button>':'')+
     '</div><div id="soGrid" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>';
-  ri(); await cat('members','select=id,nombre&order=nombre');
+  ri(); await cat('members','select=id,nombre,nombre_display&order=nombre');
   document.getElementById('soEstado').onchange=pintarPosts;
   await pintarPosts();
 }
