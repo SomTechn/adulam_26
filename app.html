@@ -415,23 +415,36 @@ async function pintarAnalitica(){
     var maxEd=Math.max.apply(null,[1].concat(ed.map(function(d){return Number(d.cantidad);})));
     out+=card('Rangos de edad','users', ed.length?ed.map(function(d){return barra(d.rango,Number(d.cantidad),maxEd,cols[d.rango]);}).join(''):'<p class="text-sm text-slate-400">Sin datos.</p>');
   }catch(e){}
+  var showOfr=finAuditor();
+  var fila=function(nombre, asist, ofr, extra){
+    return '<div class="flex items-center gap-2 py-2 border-b border-slate-50 last:border-0">'+
+      '<span class="flex-1 min-w-0 text-sm text-slate-700 truncate">'+esc(nombre)+(extra?' <span class="text-slate-400 text-xs">'+extra+'</span>':'')+'</span>'+
+      '<span class="text-sm font-semibold text-slate-800 text-right whitespace-nowrap">'+(asist!=null?(+asist):'\u2014')+'<span class="text-[10px] text-slate-400 font-normal"> asist</span></span>'+
+      (ofr!=null?'<span class="text-sm font-semibold text-emerald-700 text-right whitespace-nowrap w-24">'+dinero(ofr)+'</span>':'')+'</div>';
+  };
   try{
-    var sv=await rpcJson('stats_asistencia_servicio');
-    var maxSv=Math.max.apply(null,[1].concat(sv.map(function(d){return Number(d.promedio);})));
-    out+=card('Promedio por servicio','clipboard-check', sv.length?sv.map(function(d){return barra(d.servicio,Number(d.promedio),maxSv,'#6366f1',d.promedio+' <span class="text-slate-400 font-normal">(últ '+d.ultimo+')</span>');}).join(''):'<p class="text-sm text-slate-400">Sin asistencia registrada aún.</p>');
+    var sv=await rpcJson('stats_por_servicio');
+    var cuerpoSv = sv.length
+      ? '<p class="text-xs text-slate-400 mb-2">Promedio de asistentes'+(showOfr?' y de ofrenda':'')+' en cada <b>tipo de reuni\u00f3n</b> (Culto Dominical, Reuni\u00f3n Mi\u00e9rcoles, etc.).</p>'+
+        sv.map(function(d){ return fila(d.servicio, d.asist_prom, (showOfr && d.ofrenda_prom!=null)?d.ofrenda_prom:null, '\u00d7'+d.veces); }).join('')
+      : '<p class="text-sm text-slate-400">Sin asistencia registrada a\u00fan.</p>';
+    out+=card('Promedio por tipo de servicio','clipboard-check', cuerpoSv);
   }catch(e){}
   try{
-    var di=await rpcJson('stats_asistencia_dia');
-    var maxDi=Math.max.apply(null,[1].concat(di.map(function(d){return Number(d.promedio);})));
-    out+=card('Promedio por día','calendar-days', di.length?di.map(function(d){return barra(d.dia,Number(d.promedio),maxDi,'#8b5cf6',String(d.promedio));}).join(''):'<p class="text-sm text-slate-400">Sin datos.</p>');
+    var di=await rpcJson('stats_por_dia');
+    var cuerpoDi = di.length
+      ? '<p class="text-xs text-slate-400 mb-2">Los mismos promedios pero agrupados por <b>d\u00eda de la semana</b>. \u00datil si un mismo d\u00eda tiene varios servicios.</p>'+
+        di.map(function(d){ return fila(d.dia, d.asist_prom, (showOfr && d.ofrenda_prom!=null)?d.ofrenda_prom:null, d.servicios+' serv'); }).join('')
+      : '<p class="text-sm text-slate-400">Sin datos.</p>';
+    out+=card('Promedio por d\u00eda de la semana','calendar-days', cuerpoDi);
   }catch(e){}
-  if(finAuditor()){
+  if(showOfr){
     try{
       var of=await rpcJson('stats_ofrenda_asistente');
       var val=of.filter(function(d){return d.por_asistente!=null;});
       var inner;
-      if(val.length){ var prom=val.reduce(function(a,d){return a+Number(d.por_asistente);},0)/val.length; inner='<p class="text-3xl font-bold text-slate-800">'+dinero(prom)+'</p><p class="text-sm text-slate-500 mt-1">por asistente · '+val.length+' servicio'+(val.length!==1?'s':'')+'</p>'; }
-      else { inner='<p class="text-sm text-slate-400">Registra asistencia y ofrenda con la misma fecha de servicio para ver esta métrica.</p>'; }
+      if(val.length){ var prom=val.reduce(function(a,d){return a+Number(d.por_asistente);},0)/val.length; inner='<p class="text-3xl font-bold text-slate-800">'+dinero(prom)+'</p><p class="text-sm text-slate-500 mt-1">ofrenda promedio por asistente \u00b7 '+val.length+' servicio'+(val.length!==1?'s':'')+'</p>'; }
+      else { inner='<p class="text-sm text-slate-400">Registra asistencia y ofrenda con la misma fecha de servicio para ver esta m\u00e9trica.</p>'; }
       out+=card('Ofrenda por asistente','hand-coins', inner);
     }catch(e){}
   }
@@ -1909,6 +1922,7 @@ function lineChart(labels, series, opts){
     if(n>8 && i%2!==0 && i!==n-1) return;
     g+='<text x="'+xat(i)+'" y="'+(H-10)+'" text-anchor="middle" font-size="13" fill="#64748b">'+esc(l)+'</text>';
   });
+  if(opts.showValues){ series.forEach(function(s){ s.data.forEach(function(v,i){ var ly=Math.max(yat(v)-8, pt+9); g+='<text x="'+xat(i)+'" y="'+ly+'" text-anchor="middle" font-size="12" font-weight="700" fill="'+(s.color||GC.indigo)+'">'+v+'</text>'; }); }); }
   return g+'</svg>';
 }
 
@@ -2267,7 +2281,7 @@ function render_stats(mem, etapas, crec, asis, vis, casas, finMes, finCat, dec, 
   var totCrec=crec.reduce(function(a,b){ return a+Number(b.nuevos_mes); },0);
   var cuerpoCrec = totCrec<=1
     ? chartEmpty('trending-up','Aquí verás cómo crece tu congregación mes a mes. La línea cobrará forma conforme se registren miembros a lo largo del tiempo.')
-    : lineChart(crec.map(function(x){return x.etiqueta;}), [{data:crec.map(function(x){return Number(x.acumulado);}),color:GC.indigo}])+
+    : lineChart(crec.map(function(x){return x.etiqueta;}), [{data:crec.map(function(x){return Number(x.acumulado);}),color:GC.indigo}], {showValues:true})+
       '<p class="text-xs text-slate-400 text-center mt-2">Miembros acumulados · últimos 12 meses</p>';
   h+=card('Crecimiento de la membresía','trending-up',cuerpoCrec);
 
@@ -2290,7 +2304,7 @@ function render_stats(mem, etapas, crec, asis, vis, casas, finMes, finCat, dec, 
   var hayAsis=asis.some(function(x){ return Number(x.promedio)>0; });
   var cuerpoAsis = !hayAsis
     ? chartEmpty('clipboard-check','Registra asistencia unas semanas y aquí aparecerá la tendencia: si tu congregación crece, se mantiene o necesita atención.')
-    : lineChart(asis.map(function(x){return x.etiqueta;}), [{data:asis.map(function(x){return Number(x.promedio);}),color:GC.emerald}])+
+    : lineChart(asis.map(function(x){return x.etiqueta;}), [{data:asis.map(function(x){return Number(x.promedio);}),color:GC.emerald}], {showValues:true})+
       '<p class="text-xs text-slate-400 text-center mt-2">Promedio de asistentes por semana · últimas 12 semanas</p>';
   h+='<div class="mb-4">'+card('Tendencia de asistencia','line-chart',cuerpoAsis)+'</div>';
 
@@ -2323,11 +2337,14 @@ function render_stats(mem, etapas, crec, asis, vis, casas, finMes, finCat, dec, 
   if(finAuditor() && finMes){
     var hayFin=finMes.some(function(x){ return Number(x.ingresos)>0||Number(x.egresos)>0; });
     if(hayFin){
+      var filasMes=finMes.filter(function(x){return Number(x.ingresos)||Number(x.egresos);}).map(function(x){ var neto=Number(x.neto);
+        return '<div class="flex items-center justify-between text-xs py-1.5 border-b border-slate-50 last:border-0"><span class="w-12 text-slate-600 font-medium">'+esc(x.etiqueta)+'</span><span class="flex-1 text-right text-emerald-600">'+dinero(x.ingresos)+'</span><span class="flex-1 text-right text-red-500">'+dinero(x.egresos)+'</span><span class="flex-1 text-right font-semibold '+(neto>=0?'text-slate-800':'text-red-600')+'">'+dinero(neto)+'</span></div>'; }).join('');
+      var desgloseMes='<div class="mt-3 pt-2 border-t border-slate-100"><div class="flex items-center justify-between text-[10px] uppercase tracking-wide text-slate-400 mb-1 font-semibold"><span class="w-12">Mes</span><span class="flex-1 text-right">Ingresos</span><span class="flex-1 text-right">Egresos</span><span class="flex-1 text-right">Balance</span></div>'+filasMes+'</div>';
       h+='<div class="mb-4">'+card('Ingresos y egresos','bar-chart-3',
         barChart(finMes.map(function(x){return x.etiqueta;}),
           [{data:finMes.map(function(x){return Number(x.ingresos);}),color:GC.emerald},
            {data:finMes.map(function(x){return Number(x.egresos);}),color:GC.red}])+
-        legend([{label:'Ingresos',color:GC.emerald},{label:'Egresos',color:GC.red}]),
+        legend([{label:'Ingresos',color:GC.emerald},{label:'Egresos',color:GC.red}])+desgloseMes,
         '<span class="text-xs text-slate-400">últimos 12 meses</span>')+'</div>';
 
       var ingCat=finCat.filter(function(c){ return c.tipo==='ingreso'; });
