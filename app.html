@@ -780,6 +780,14 @@ function formCasa(h){
    '<div><label class="text-sm font-medium">Anfitrión</label><select name="anfitrion_id" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"><option value="">Sin anfitrión</option>'+
      mem.map(function(m){return '<option value="'+m.id+'"'+(h.anfitrion_id===m.id?' selected':'')+'>'+esc(m.nombre)+'</option>';}).join('')+'</select></div>'+
    '<div><label class="text-sm font-medium">Dirección</label><input name="direccion" value="'+esc(h.direccion||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+   '<div class="bg-slate-50 rounded-xl p-3">'+
+     '<div class="flex items-center justify-between mb-1.5"><label class="text-sm font-medium text-slate-700 flex items-center gap-1.5"><i data-lucide="map-pin" class="w-4 h-4"></i>Ubicación <span class="text-xs text-slate-400 font-normal">(para el mapa)</span></label>'+
+     '<button type="button" onclick="ubicarMiembroActual(this)" class="text-xs px-2.5 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg font-medium flex items-center gap-1"><i data-lucide="locate-fixed" class="w-3.5 h-3.5"></i>Usar mi ubicación</button></div>'+
+     '<div class="grid grid-cols-2 gap-2">'+
+       '<input name="lat" inputmode="decimal" value="'+esc(h.lat!=null?String(h.lat):'')+'" placeholder="Latitud" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">'+
+       '<input name="lng" inputmode="decimal" value="'+esc(h.lng!=null?String(h.lng):'')+'" placeholder="Longitud" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">'+
+     '</div>'+
+   '</div>'+
    '<div class="grid grid-cols-2 gap-3">'+
      '<div><label class="text-sm font-medium">Día</label><select name="dia_reunion" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"><option value="">—</option>'+
        dias.map(function(d){return '<option value="'+d+'"'+(h.dia_reunion===d?' selected':'')+'>'+d+'</option>';}).join('')+'</select></div>'+
@@ -791,7 +799,7 @@ function formCasa(h){
     e.preventDefault();
     try{
       var fd=new FormData(e.target);
-      var b={nombre:fd.get('nombre'),anfitrion_id:fd.get('anfitrion_id')||null,direccion:fd.get('direccion')||null,dia_reunion:fd.get('dia_reunion')||null,hora:fd.get('hora')||null,descripcion:fd.get('descripcion')||null};
+      var b={nombre:fd.get('nombre'),anfitrion_id:fd.get('anfitrion_id')||null,direccion:fd.get('direccion')||null,dia_reunion:fd.get('dia_reunion')||null,hora:fd.get('hora')||null,descripcion:fd.get('descripcion')||null,lat:parseFloat(fd.get('lat'))||null,lng:parseFloat(fd.get('lng'))||null};
       if(h.id) await dbPatch('houses','id=eq.'+h.id,b); else await dbPost('houses',b);
       limpiarCache('houses'); toast('Guardado','success'); closeModal('mH'); pintarCasas();
     }catch(err){ toast(err.message.slice(0,120),'error'); }
@@ -1248,10 +1256,11 @@ async function compartirPlan(id){
     if(p.especial1||p.especial1_nombre) roles.push(['✨ '+(p.especial1||'Especial'),p.especial1_nombre||'']);
     if(p.especial2||p.especial2_nombre) roles.push(['✨ '+(p.especial2||'Especial'),p.especial2_nombre||'']);
     if(p.predica||p.predicador) roles.push(['📖 Predica',p.predica||p.predicador]);
-    if(p.anuncios||p.anuncios_texto){ var _av=p.anuncios_texto?(p.anuncios_texto+(p.anuncios?' ('+p.anuncios+')':'')):p.anuncios; roles.push(['📢 Anuncios',_av]); }
+    var anunLineas = p.anuncios_texto ? p.anuncios_texto.split(/\r?\n/).map(function(x){ return x.trim(); }).filter(Boolean) : [];
 
     window._compartir = { fecha:f, hora:p.hora?horaTxt(p.hora):'', tipo:(p.reunion||p.tipo_reunion), tema:p.tema,
-      roles:roles, tareas: ts.map(function(t){ return { n:t.nombre_tarea, r:(t.members?t.members.nombre:null) }; }) };
+      roles:roles, anuncios:(p.anuncios||''), anunLineas:anunLineas,
+      tareas: ts.map(function(t){ return { n:t.nombre_tarea, r:(t.members?t.members.nombre:null) }; }) };
 
     var filas=roles.map(function(r){
       return '<div class="bg-white/10 rounded-lg px-3 py-2 flex items-center justify-between gap-2"><span class="text-sm">'+esc(r[0])+'</span><span class="text-sm font-semibold text-right">'+esc(r[1]||'—')+'</span></div>';
@@ -1259,14 +1268,15 @@ async function compartirPlan(id){
     var filasT=ts.length?('<div class="border-t border-white/20 pt-2 mt-2 space-y-1">'+ts.map(function(t){
       return '<div class="flex items-center justify-between text-xs text-white/90"><span>'+esc(t.nombre_tarea)+'</span><span>'+esc(t.members?t.members.nombre:'—')+'</span></div>';
     }).join('')+'</div>'):'';
+    var anunBloque = anunLineas.length ? ('<div class="bg-white/15 rounded-xl p-3 mt-3"><div class="text-xs uppercase tracking-widest opacity-80 mb-1.5">📢 Anuncios'+(p.anuncios?' · '+esc(p.anuncios):'')+'</div><div class="space-y-1">'+anunLineas.map(function(l){ return '<div class="text-sm leading-snug flex items-start gap-1.5"><span class="opacity-70">•</span><span>'+esc(l)+'</span></div>'; }).join('')+'</div></div>') : '';
 
     modal('mC','<div id="flyer" class="flyer text-white p-6 sm:p-8">'+
-      '<div class="text-center mb-4"><div class="text-xs uppercase tracking-widest opacity-80 mb-1">Iglesia ADULAM</div>'+
+      '<div class="text-center mb-4"><div class="text-5xl sm:text-6xl font-black tracking-wider mb-1" style="letter-spacing:.1em">ADULAM</div>'+
       '<div class="text-4xl mb-2">'+esc(p.reunion_icono||'⛪')+'</div>'+
       '<h2 class="text-2xl sm:text-3xl font-bold leading-tight">'+esc(p.reunion||p.tipo_reunion)+'</h2>'+
       '<p class="text-base mt-1 capitalize">'+esc(f)+(p.hora?' · '+horaTxt(p.hora):'')+'</p></div>'+
       (p.tema?'<div class="bg-white/15 rounded-xl p-3 text-center mb-4"><div class="text-xs uppercase opacity-80">Tema</div><div class="text-lg font-semibold">'+esc(p.tema)+'</div></div>':'')+
-      '<div class="space-y-1.5">'+filas+filasT+'</div>'+
+      '<div class="space-y-1.5">'+filas+filasT+'</div>'+anunBloque+
       '<div class="text-center mt-5 text-xs opacity-70">Compartido desde ADULAM</div></div>'+
       '<div class="p-4 flex flex-col sm:flex-row gap-2 bg-slate-100 np">'+
       '<button onclick="descargarFlyer()" class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2"><i data-lucide="download" class="w-4 h-4"></i>Descargar imagen</button>'+
@@ -1281,6 +1291,7 @@ function copiarTextoPlan(){
   t+='\n*Organización del servicio:*\n';
   d.roles.forEach(function(r){ t+=r[0]+': '+(r[1]||'sin asignar')+'\n'; });
   if(d.tareas.length){ t+='\n*Otras tareas:*\n'; d.tareas.forEach(function(x){ t+='• '+x.n+': '+(x.r||'sin asignar')+'\n'; }); }
+  if(d.anunLineas && d.anunLineas.length){ t+='\n*📢 Anuncios:*'+(d.anuncios?' ('+d.anuncios+')':'')+'\n'; d.anunLineas.forEach(function(l){ t+='• '+l+'\n'; }); }
   t+='\n_Bendiciones. ¡Te esperamos!_';
   copiar(t);
 }
@@ -2079,25 +2090,36 @@ async function view_mapa(){
       shadowUrl:'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
     });
     var mem=await dbGet('members','select=id,nombre,lat,lng,telefono,estado_espiritual&lat=not.is.null&lng=not.is.null&situacion=eq.activo');
+    var casas=await dbGet('houses','select=id,nombre,lat,lng,direccion&lat=not.is.null&lng=not.is.null');
     p.innerHTML='<div class="mb-3"><h3 class="text-xl font-bold text-slate-800">Mapa de la congregación</h3>'+
-      '<p class="text-sm text-slate-500">'+mem.length+' miembro'+(mem.length!==1?'s ubicados':' ubicado')+' \u00b7 útil para planear Casas de Pan por zona</p></div>'+
-      (mem.length?'':'<div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-3 text-sm text-amber-800"><b>Aún no hay ubicaciones.</b> Abre la ficha de un miembro, pulsa \u201cUsar mi ubicación\u201d estando en su casa (o pega coordenadas de Google Maps) y guarda. Aquí se irán dibujando para ver cómo se agrupa la congregación.</div>')+
+      '<p class="text-sm text-slate-500">'+mem.length+' miembro'+(mem.length!==1?'s':'')+' \u00b7 '+casas.length+' Casa'+(casas.length!==1?'s':'')+' de Pan ubicada'+(casas.length!==1?'s':'')+'</p></div>'+
+      ((mem.length||casas.length)?'':'<div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-3 text-sm text-amber-800"><b>Aún no hay ubicaciones.</b> Abre la ficha de un miembro o una Casa de Pan, pulsa \u201cUsar mi ubicación\u201d estando en el lugar (o pega coordenadas de Google Maps) y guarda. Aquí se irán dibujando en el mapa.</div>')+
       '<div id="leafletMap" class="rounded-2xl border border-slate-200 overflow-hidden" style="height:70vh;min-height:380px;z-index:0"></div>';
     ri();
     if(MAPA.instance){ try{ MAPA.instance.remove(); }catch(e){} MAPA.instance=null; }
     var map=L.map('leafletMap').setView([15.60,-87.95], 13); /* López Arellano aprox. */
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ maxZoom:19, attribution:'\u00a9 OpenStreetMap' }).addTo(map);
     MAPA.instance=map;
-    if(mem.length){
-      var pts=[];
-      mem.forEach(function(m){
-        var la=Number(m.lat), ln=Number(m.lng);
-        if(isNaN(la)||isNaN(ln)) return;
-        var wa=m.telefono?'<br><a href="'+waLink(m.telefono,'\u00a1Hola '+m.nombre.split(' ')[0]+'! Dios te bendiga. \ud83d\ude4f')+'" target="_blank" style="color:#059669;font-weight:600">WhatsApp</a>':'';
-        L.marker([la,ln]).addTo(map).bindPopup('<b>'+esc(m.nombre)+'</b>'+(m.estado_espiritual?'<br><span style="color:#64748b;text-transform:capitalize">'+esc(m.estado_espiritual)+'</span>':'')+wa);
-        pts.push([la,ln]);
-      });
-      if(pts.length){ try{ map.fitBounds(pts,{ padding:[40,40], maxZoom:16 }); }catch(e){} }
+    var pts=[];
+    mem.forEach(function(m){
+      var la=Number(m.lat), ln=Number(m.lng);
+      if(isNaN(la)||isNaN(ln)) return;
+      var wa=m.telefono?'<br><a href="'+waLink(m.telefono,'\u00a1Hola '+m.nombre.split(' ')[0]+'! Dios te bendiga. \ud83d\ude4f')+'" target="_blank" style="color:#059669;font-weight:600">WhatsApp</a>':'';
+      L.marker([la,ln]).addTo(map).bindPopup('<b>'+esc(m.nombre)+'</b>'+(m.estado_espiritual?'<br><span style="color:#64748b;text-transform:capitalize">'+esc(m.estado_espiritual)+'</span>':'')+wa);
+      pts.push([la,ln]);
+    });
+    var casaIcon=L.divIcon({ className:'', html:'<div style="background:#f59e0b;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)">\ud83c\udf3e</div>', iconSize:[30,30], iconAnchor:[15,15] });
+    casas.forEach(function(c){
+      var la=Number(c.lat), ln=Number(c.lng);
+      if(isNaN(la)||isNaN(ln)) return;
+      L.marker([la,ln],{ icon:casaIcon }).addTo(map).bindPopup('<b>\ud83c\udf3e '+esc(c.nombre)+'</b>'+(c.direccion?'<br><span style="color:#64748b">'+esc(c.direccion)+'</span>':''));
+      pts.push([la,ln]);
+    });
+    if(pts.length){ try{ map.fitBounds(pts,{ padding:[40,40], maxZoom:16 }); }catch(e){} }
+    if(mem.length||casas.length){
+      var leyenda=L.control({position:'bottomleft'});
+      leyenda.onAdd=function(){ var div=L.DomUtil.create('div'); div.style.cssText='background:#fff;padding:6px 10px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.2);font:12px sans-serif;line-height:1.5'; div.innerHTML='<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px"><span style="width:12px;height:12px;background:#3b82f6;border-radius:50%;display:inline-block"></span>Miembros</div><div style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;background:#f59e0b;border-radius:50%;display:inline-block"></span>Casas de Pan</div>'; return div; };
+      leyenda.addTo(map);
     }
     setTimeout(function(){ try{ map.invalidateSize(); }catch(e){} }, 220);
   }catch(e){ errorPagina(e); }
