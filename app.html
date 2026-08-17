@@ -294,6 +294,7 @@ var MENU = [
   { id:'services',     icon:'calendar-days',    label:'Servicios',      roles:['admin','pastor','lider','servidor'] },
   { id:'treasury',     icon:'wallet',           label:'Tesorería',      roles:['admin','pastor','tesorero','fiscal'] },
   { id:'pastoral',     icon:'hand-coins',       label:'Ingreso Pastoral',roles:['admin','pastor'] },
+  { id:'metas',        icon:'target',           label:'Metas',          roles:['admin','pastor','tesorero','fiscal','lider','servidor','miembro'] },
   { id:'social',       icon:'share-2',          label:'Redes Sociales', roles:['admin','pastor','lider','servidor'] },
   { id:'automations',  icon:'zap',              label:'Automatización', roles:['admin','pastor','lider'] },
   { id:'users',        icon:'shield-check',     label:'Usuarios',       roles:['admin','pastor'] }
@@ -2310,6 +2311,201 @@ async function borrarIngresoPastoral(id){
   try{ await dbDel('ingresos_pastorales','id=eq.'+id); toast('Eliminado','success'); pintarPastoral(); }
   catch(e){ toast(e.message.slice(0,140),'error'); }
 }
+
+/* ---------- METAS, FONDO Y ACTIVIDADES ---------- */
+var MET={ fondoId:null, catIng:null, catEgr:null };
+var META_CAT={ sonido:['Sonido','mic','indigo'], mobiliario:['Mobiliario','armchair','amber'], remodelacion:['Remodelación','hammer','emerald'], instrumento:['Instrumento','music','violet'], otro:['Otro','package','slate'] };
+var META_PRIOR={ '1':['Alta','bg-red-100 text-red-700'], '2':['Media','bg-amber-100 text-amber-700'], '3':['Baja','bg-slate-100 text-slate-500'] };
+
+async function metInit(){
+  if(MET.fondoId!==null) return;
+  try{
+    var c=await dbGet('cajas','select=id&nombre=eq.Fondo de Metas&ambito=eq.proyecto&limit=1');
+    MET.fondoId=c.length?c[0].id:false;
+    var cc=await dbGet('caja_categorias','select=id,nombre,tipo&nombre=in.(Actividad,Compra de metas)');
+    cc.forEach(function(x){ if(x.tipo==='ingreso') MET.catIng=x.id; if(x.tipo==='egreso') MET.catEgr=x.id; });
+  }catch(e){ if(MET.fondoId===null) MET.fondoId=false; }
+}
+function metTermometro(asig, cot){
+  var pct=cot>0?Math.min(100,Math.round(asig/cot*100)):0;
+  return '<div class="mt-2"><div class="flex justify-between text-xs mb-1"><span class="text-slate-500">'+dinero(asig)+' <span class="text-slate-400">de</span> '+dinero(cot)+'</span><span class="font-bold '+(pct>=100?'text-emerald-600':'text-indigo-600')+'">'+pct+'%</span></div><div class="h-3 bg-slate-100 rounded-full overflow-hidden"><div class="h-full rounded-full transition-all" style="width:'+pct+'%;background:'+(pct>=100?'#10b981':'#6366f1')+'"></div></div></div>';
+}
+async function view_metas(){
+  var p=document.getElementById('page'), gestion=puede(['admin','pastor','tesorero']);
+  p.innerHTML='<div id="metResumen"></div>'+
+    (gestion?'<div class="flex flex-wrap gap-2 mb-4"><button onclick="formMeta()" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl flex items-center gap-2"><i data-lucide="plus" class="w-5 h-5"></i>Nueva meta</button><button onclick="formActividad()" class="px-4 py-2.5 bg-white border border-slate-300 text-slate-700 font-medium rounded-xl flex items-center gap-2"><i data-lucide="calendar-plus" class="w-5 h-5"></i>Nueva actividad</button></div>':'')+
+    '<div id="metLista" class="grid sm:grid-cols-2 gap-3 mb-6"></div>'+
+    (gestion?'<h3 class="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><i data-lucide="party-popper" class="w-5 h-5 text-indigo-500"></i>Actividades</h3><div id="metActs" class="space-y-2"></div>':'');
+  ri(); await pintarMetas();
+}
+async function pintarMetas(){
+  var gestion=puede(['admin','pastor','tesorero']);
+  if(gestion) await metInit();
+  var metas=await dbGet('metas','select=*&order=estado.asc,prioridad.asc,orden.asc');
+  if(gestion){
+    try{
+      var r=(await dbGet('v_fondo_resumen','select=*'))[0]||{saldo:0,reservado:0,disponible:0};
+      var el=document.getElementById('metResumen'); if(el) el.innerHTML=
+        '<div class="bg-gradient-to-br from-indigo-600 to-violet-700 text-white rounded-2xl p-5 mb-4">'+
+          '<div class="text-xs uppercase tracking-wide opacity-80">Fondo de metas</div>'+
+          '<div class="text-3xl font-bold mt-1">'+dinero(r.saldo)+'</div>'+
+          '<div class="grid grid-cols-2 gap-2 mt-3 text-sm">'+
+            '<div class="bg-white/15 rounded-xl px-3 py-2"><div class="opacity-80 text-xs">Repartido a metas</div><div class="font-semibold">'+dinero(r.reservado)+'</div></div>'+
+            '<div class="bg-white/15 rounded-xl px-3 py-2"><div class="opacity-80 text-xs">Por repartir</div><div class="font-semibold">'+dinero(r.disponible)+'</div></div>'+
+          '</div></div>';
+    }catch(e){}
+  }
+  var L=document.getElementById('metLista');
+  if(L){
+    if(!metas.length){ L.innerHTML='<div class="sm:col-span-2">'+vacio('target','Aún no hay metas.'+(gestion?' Crea la primera con "Nueva meta".':''))+'</div>'; }
+    else L.innerHTML=metas.map(function(m){
+      var c=META_CAT[m.categoria]||META_CAT.otro, cumplida=m.estado==='cumplida', pausada=m.estado==='pausada';
+      var pr=META_PRIOR[''+m.prioridad]||META_PRIOR['2'];
+      return '<div onclick="perfilMeta(\''+m.id+'\')" class="bg-white rounded-2xl border '+(cumplida?'border-emerald-200':'border-slate-200')+' p-4 cursor-pointer hover:shadow-md transition '+(pausada?'opacity-60':'')+'">'+
+        '<div class="flex items-start gap-3">'+
+          '<div class="w-10 h-10 rounded-xl bg-'+c[2]+'-100 text-'+c[2]+'-700 flex items-center justify-center flex-shrink-0"><i data-lucide="'+c[1]+'" class="w-5 h-5"></i></div>'+
+          '<div class="flex-1 min-w-0"><div class="font-bold text-slate-800 truncate">'+esc(m.nombre)+'</div>'+
+          '<div class="flex items-center gap-1.5 mt-0.5"><span class="text-[10px] px-1.5 py-0.5 rounded-full '+pr[1]+'">'+pr[0]+'</span><span class="text-[11px] text-slate-400">'+esc(c[0])+'</span></div></div>'+
+          (cumplida?'<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-semibold flex items-center gap-1 flex-shrink-0"><i data-lucide="check" class="w-3 h-3"></i>Cumplida</span>':'')+
+        '</div>'+metTermometro(Number(m.asignado),Number(m.cotizacion))+'</div>';
+    }).join('');
+    ri();
+  }
+  if(gestion){
+    var acts=await dbGet('actividades','select=*,members(nombre,nombre_display)&order=fecha.desc.nullslast,created_at.desc');
+    var rec={}; try{ (await dbGet('v_actividad_recaudo','select=*')).forEach(function(x){ rec[x.actividad_id]=Number(x.neto); }); }catch(e){}
+    var AC=document.getElementById('metActs');
+    var estCol={planificada:'bg-slate-100 text-slate-600',en_curso:'bg-amber-100 text-amber-700',finalizada:'bg-emerald-100 text-emerald-700'};
+    var estLab={planificada:'Planificada',en_curso:'En curso',finalizada:'Finalizada'};
+    if(AC){
+      if(!acts.length){ AC.innerHTML=vacio('party-popper','Sin actividades. Crea una para recaudar hacia las metas.'); }
+      else AC.innerHTML=acts.map(function(a){
+        return '<div class="bg-white border border-slate-200 rounded-xl p-3 flex items-center gap-3">'+
+          '<div class="flex-1 min-w-0"><div class="font-semibold text-slate-800 truncate">'+esc(a.nombre)+'</div>'+
+          '<div class="text-xs text-slate-500 truncate">'+(a.fecha?fecha(a.fecha):'Sin fecha')+(a.members?' · '+esc(nomShow(a.members)):'')+' · <span class="px-1.5 py-0.5 rounded-full '+(estCol[a.estado]||'')+'">'+(estLab[a.estado]||a.estado)+'</span></div></div>'+
+          '<div class="text-right flex-shrink-0"><div class="text-sm font-bold text-emerald-700">'+dinero(rec[a.id]||0)+'</div><div class="text-[10px] text-slate-400">recaudado</div></div>'+
+          '<div class="flex flex-col gap-1 flex-shrink-0">'+
+            '<button onclick="registrarAporte(\''+a.id+'\')" class="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg" title="Registrar ingreso"><i data-lucide="plus-circle" class="w-4 h-4"></i></button>'+
+            '<button onclick="formActividad(\''+a.id+'\')" class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400"><i data-lucide="pencil" class="w-4 h-4"></i></button>'+
+          '</div></div>';
+      }).join('');
+      ri();
+    }
+  }
+}
+async function perfilMeta(id){
+  var m=(await dbGet('metas','id=eq.'+id+'&select=*'))[0]; if(!m) return;
+  var gestion=puede(['admin','pastor','tesorero']), c=META_CAT[m.categoria]||META_CAT.otro, pr=META_PRIOR[''+m.prioridad]||META_PRIOR['2'];
+  var body=mHead(esc(m.nombre),'mMeta')+
+    '<div class="p-4">'+
+      '<div class="flex items-center gap-3 mb-3"><div class="w-12 h-12 rounded-xl bg-'+c[2]+'-100 text-'+c[2]+'-700 flex items-center justify-center flex-shrink-0"><i data-lucide="'+c[1]+'" class="w-6 h-6"></i></div>'+
+        '<div><div class="text-sm text-slate-500">'+esc(c[0])+' · prioridad '+pr[0].toLowerCase()+'</div><div class="text-lg font-bold text-slate-800">Cotización: '+dinero(m.cotizacion)+'</div></div></div>'+
+      metTermometro(Number(m.asignado),Number(m.cotizacion))+
+      (m.descripcion?'<p class="text-sm text-slate-600 mt-3 whitespace-pre-line">'+esc(m.descripcion)+'</p>':'')+
+      (m.fecha_meta?'<p class="text-xs text-slate-400 mt-2">Fecha límite: '+fecha(m.fecha_meta)+'</p>':'')+
+      (m.estado==='cumplida'?'<div class="mt-3 bg-emerald-50 text-emerald-700 rounded-xl px-3 py-2 text-sm font-medium flex items-center gap-2"><i data-lucide="check-circle" class="w-4 h-4"></i>Meta cumplida</div>':'')+
+      (gestion&&m.estado!=='cumplida'?
+        '<div class="grid grid-cols-2 gap-2 mt-4">'+
+          '<button onclick="asignarMeta(\''+id+'\')" class="py-2.5 bg-indigo-600 text-white rounded-xl font-medium text-sm">Repartir fondo</button>'+
+          '<button onclick="comprarMeta(\''+id+'\')" class="py-2.5 bg-emerald-600 text-white rounded-xl font-medium text-sm">Registrar compra</button>'+
+          '<button onclick="formMeta(\''+id+'\')" class="py-2.5 bg-slate-100 rounded-xl font-medium text-sm">Editar</button>'+
+          '<button onclick="cambiarEstadoMeta(\''+id+'\',\''+(m.estado==='pausada'?'activa':'pausada')+'\')" class="py-2.5 bg-slate-100 rounded-xl font-medium text-sm">'+(m.estado==='pausada'?'Reactivar':'Pausar')+'</button>'+
+        '</div>'+(puede(['admin','pastor'])?'<button onclick="borrarMeta(\''+id+'\')" class="w-full mt-2 py-2 text-red-600 text-sm">Eliminar meta</button>':'')
+      :(gestion&&m.estado==='cumplida'&&puede(['admin','pastor'])?'<button onclick="borrarMeta(\''+id+'\')" class="w-full mt-3 py-2 text-red-600 text-sm">Eliminar meta</button>':''))+
+    '</div>';
+  modal('mMeta', body);
+}
+function formMeta(id){
+  (async function(){
+    var m={}; if(id){ m=(await dbGet('metas','id=eq.'+id+'&select=*'))[0]||{}; }
+    var opCat=Object.keys(META_CAT).map(function(k){return '<option value="'+k+'"'+((m.categoria||'otro')===k?' selected':'')+'>'+META_CAT[k][0]+'</option>';}).join('');
+    var opPri=[['1','Alta'],['2','Media'],['3','Baja']].map(function(x){return '<option value="'+x[0]+'"'+((''+(m.prioridad||2))===x[0]?' selected':'')+'>'+x[1]+'</option>';}).join('');
+    modal('mMF', mHead((id?'Editar':'Nueva')+' meta','mMF')+
+      '<form id="fMF" class="p-4 space-y-3">'+
+      '<div><label class="text-sm font-medium">Nombre *</label><input name="nombre" required value="'+esc(m.nombre||'')+'" placeholder="Ej: Piano, Micrófonos, Pintura del templo" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+      '<div class="grid grid-cols-2 gap-3"><div><label class="text-sm font-medium">Categoría</label><select name="categoria" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg bg-white">'+opCat+'</select></div>'+
+        '<div><label class="text-sm font-medium">Prioridad</label><select name="prioridad" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg bg-white">'+opPri+'</select></div></div>'+
+      '<div class="grid grid-cols-2 gap-3"><div><label class="text-sm font-medium">Cotización (L) *</label><input name="cotizacion" type="number" step="0.01" min="0" required value="'+(m.cotizacion!=null?m.cotizacion:'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+        '<div><label class="text-sm font-medium">Fecha límite</label><input name="fecha_meta" type="date" value="'+esc(m.fecha_meta||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div></div>'+
+      '<div><label class="text-sm font-medium">Descripción / cotización</label><textarea name="descripcion" rows="2" placeholder="Proveedor, detalles, enlace..." class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg">'+esc(m.descripcion||'')+'</textarea></div>'+
+      mFoot('mMF',id?'Guardar':'Crear')+'</form>');
+    document.getElementById('fMF').onsubmit=async function(e){
+      e.preventDefault(); var btn=e.target.querySelector('button[type=submit]'); btn.disabled=true;
+      try{
+        var fd=new FormData(e.target);
+        var b={ nombre:fd.get('nombre'), categoria:fd.get('categoria'), prioridad:parseInt(fd.get('prioridad'),10)||2, cotizacion:parseFloat(fd.get('cotizacion'))||0, fecha_meta:fd.get('fecha_meta')||null, descripcion:(fd.get('descripcion')||'').trim()||null };
+        if(id) await dbPatch('metas','id=eq.'+id,b); else await dbPost('metas',b);
+        toast('Meta guardada','success'); closeModal('mMF'); if(document.getElementById('mMeta')) closeModal('mMeta'); pintarMetas();
+      }catch(err){ toast(err.message.slice(0,140),'error'); btn.disabled=false; }
+    };
+  })();
+}
+function formActividad(id){
+  (async function(){
+    var a={}; if(id){ a=(await dbGet('actividades','id=eq.'+id+'&select=*'))[0]||{}; }
+    var mem=(S.cache.members&&S.cache.members.length)?S.cache.members:await dbGet('members','select=id,nombre,nombre_display&order=nombre');
+    var opResp='<option value="">— Responsable —</option>'+mem.map(function(x){return '<option value="'+x.id+'"'+(a.responsable_id===x.id?' selected':'')+'>'+esc(nomShow(x))+'</option>';}).join('');
+    var opEst=[['planificada','Planificada'],['en_curso','En curso'],['finalizada','Finalizada']].map(function(x){return '<option value="'+x[0]+'"'+((a.estado||'planificada')===x[0]?' selected':'')+'>'+x[1]+'</option>';}).join('');
+    modal('mAct', mHead((id?'Editar':'Nueva')+' actividad','mAct')+
+      '<form id="fAct" class="p-4 space-y-3">'+
+      '<div><label class="text-sm font-medium">Nombre *</label><input name="nombre" required value="'+esc(a.nombre||'')+'" placeholder="Ej: Kermés, Venta de comida" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+      '<div class="grid grid-cols-2 gap-3"><div><label class="text-sm font-medium">Fecha</label><input name="fecha" type="date" value="'+esc(a.fecha||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+        '<div><label class="text-sm font-medium">Estado</label><select name="estado" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg bg-white">'+opEst+'</select></div></div>'+
+      '<div><label class="text-sm font-medium">Responsable</label><select name="responsable_id" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg bg-white">'+opResp+'</select></div>'+
+      '<div><label class="text-sm font-medium">Meta de recaudo (opcional)</label><input name="meta_recaudo" type="number" step="0.01" min="0" value="'+(a.meta_recaudo!=null?a.meta_recaudo:'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+      '<div><label class="text-sm font-medium">Descripción</label><textarea name="descripcion" rows="2" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg">'+esc(a.descripcion||'')+'</textarea></div>'+
+      mFoot('mAct',id?'Guardar':'Crear')+'</form>');
+    document.getElementById('fAct').onsubmit=async function(e){
+      e.preventDefault(); var btn=e.target.querySelector('button[type=submit]'); btn.disabled=true;
+      try{
+        var fd=new FormData(e.target);
+        var b={ nombre:fd.get('nombre'), fecha:fd.get('fecha')||null, estado:fd.get('estado'), responsable_id:fd.get('responsable_id')||null, meta_recaudo:parseFloat(fd.get('meta_recaudo'))||null, descripcion:(fd.get('descripcion')||'').trim()||null };
+        if(id) await dbPatch('actividades','id=eq.'+id,b); else await dbPost('actividades',b);
+        toast('Actividad guardada','success'); closeModal('mAct'); pintarMetas();
+      }catch(err){ toast(err.message.slice(0,140),'error'); btn.disabled=false; }
+    };
+  })();
+}
+async function registrarAporte(actId){
+  await metInit();
+  if(!MET.fondoId){ toast('No se encontró la caja del fondo','error'); return; }
+  var a=(await dbGet('actividades','id=eq.'+actId+'&select=nombre'))[0]; if(!a) return;
+  var val=prompt('Registrar lo recaudado en "'+a.nombre+'".\n¿Monto que ingresó al fondo? (L)','');
+  if(val===null) return;
+  var n=parseFloat(val); if(isNaN(n)||n<=0){ toast('Monto inválido','warning'); return; }
+  try{
+    await dbPost('treasury',{ caja_id:MET.fondoId, tipo:'ingreso', categoria_id:MET.catIng||null, actividad_id:actId, monto:n, fecha:hoy(), metodo:'efectivo', descripcion:'Actividad: '+a.nombre, registrado_por:(S.user?S.user.id:null) });
+    toast('Ingreso registrado en el fondo','success'); pintarMetas();
+  }catch(e){ toast(e.message.slice(0,150),'error'); }
+}
+async function asignarMeta(id){
+  await metInit();
+  var m=(await dbGet('metas','id=eq.'+id+'&select=nombre,asignado,cotizacion'))[0]; if(!m) return;
+  var r=(await dbGet('v_fondo_resumen','select=disponible'))[0]||{disponible:0};
+  var disp=Number(r.disponible)+Number(m.asignado);
+  var val=prompt('¿Cuánto del fondo asignas a "'+m.nombre+'"?\n\nDisponible: '+dinero(disp)+'\nCotización: '+dinero(m.cotizacion)+'\nAsignado actual: '+dinero(m.asignado), m.asignado);
+  if(val===null) return;
+  var n=parseFloat(val); if(isNaN(n)||n<0){ toast('Monto inválido','warning'); return; }
+  if(n>disp+0.001){ toast('El fondo no tiene tanto disponible','warning'); return; }
+  try{ await dbPatch('metas','id=eq.'+id,{asignado:n}); toast('Fondo repartido','success'); closeModal('mMeta'); pintarMetas(); }
+  catch(e){ toast(e.message.slice(0,140),'error'); }
+}
+async function comprarMeta(id){
+  await metInit();
+  if(!MET.fondoId){ toast('No se encontró la caja del fondo','error'); return; }
+  var m=(await dbGet('metas','id=eq.'+id+'&select=nombre,cotizacion'))[0]; if(!m) return;
+  var val=prompt('Registrar la compra de "'+m.nombre+'".\n¿Monto real pagado? (sale del fondo)', m.cotizacion);
+  if(val===null) return;
+  var n=parseFloat(val); if(isNaN(n)||n<0){ toast('Monto inválido','warning'); return; }
+  if(!confirm('Se registrará un egreso de '+dinero(n)+' del Fondo de Metas y la meta quedará como cumplida. ¿Continuar?')) return;
+  try{
+    await dbPost('treasury',{ caja_id:MET.fondoId, tipo:'egreso', categoria_id:MET.catEgr||null, meta_id:id, monto:n, fecha:hoy(), metodo:'efectivo', descripcion:'Compra: '+m.nombre, registrado_por:(S.user?S.user.id:null) });
+    await dbPatch('metas','id=eq.'+id,{estado:'cumplida'});
+    toast('Compra registrada · meta cumplida','success'); closeModal('mMeta'); pintarMetas();
+  }catch(e){ toast(e.message.slice(0,150),'error'); }
+}
+async function cambiarEstadoMeta(id,est){ try{ await dbPatch('metas','id=eq.'+id,{estado:est}); toast('Actualizado','success'); closeModal('mMeta'); pintarMetas(); }catch(e){ toast(e.message.slice(0,120),'error'); } }
+async function borrarMeta(id){ if(!confirm('¿Eliminar esta meta? (No borra los movimientos de tesorería ya registrados)')) return; try{ await dbDel('metas','id=eq.'+id); toast('Eliminada','success'); closeModal('mMeta'); pintarMetas(); }catch(e){ toast(e.message.slice(0,120),'error'); } }
 
 async function view_stats(){
   var p=document.getElementById('page');
