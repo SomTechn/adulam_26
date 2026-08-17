@@ -122,7 +122,7 @@ var S = { session:null, user:null, profile:null, cache:{}, misCajas:0 };
 /* ---------- utilidades ---------- */
 function ri(){ if(window.lucide) lucide.createIcons(); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
-function fecha(f){ if(!f) return '-'; try{ return new Date(f).toLocaleDateString('es-HN',{day:'2-digit',month:'2-digit',year:'numeric'}); }catch(e){return '-';} }
+function fecha(f){ if(!f) return '-'; try{ var d=(typeof f==='string'&&f.length===10&&f.indexOf('T')===-1)?new Date(f+'T12:00:00'):new Date(f); return d.toLocaleDateString('es-HN',{day:'2-digit',month:'2-digit',year:'numeric'}); }catch(e){return '-';} }
 function dinero(n){ if(n==null) return 'L 0.00'; return 'L '+Number(n).toLocaleString('es-HN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function edadRango(fnac){
   if(!fnac) return {edad:null,rango:'Sin fecha',color:'slate'};
@@ -139,7 +139,7 @@ function edadRango(fnac){
   else{r='Adultos mayores';c='rose';}
   return {edad:e,rango:r,color:c};
 }
-function hoy(){ return new Date().toISOString().slice(0,10); }
+function hoy(){ var d=new Date(); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
 function nomShow(m){ if(!m) return ''; var d=m.nombre_display; return (d&&(''+d).trim())?(''+d).trim():(m.nombre||''); }
 
 function toast(msg,tipo){
@@ -2313,7 +2313,8 @@ async function borrarIngresoPastoral(id){
 }
 
 /* ---------- METAS, FONDO Y ACTIVIDADES ---------- */
-var MET={ fondoId:null, catIng:null, catEgr:null };
+var MET={ fondoId:null, catIng:null, catEgr:null, catGasto:null };
+var ACT_TIPOS={ venta_comida:['Venta de comida','utensils'], boletos:['Boletos / Rifa','ticket'], kermes:['Kermés','party-popper'], ofrenda_especial:['Ofrenda especial','gift'], servicio:['Servicio / trabajo','hammer'], otro:['Otro','sparkles'] };
 var META_CAT={ sonido:['Sonido','mic','indigo'], mobiliario:['Mobiliario','armchair','amber'], remodelacion:['Remodelación','hammer','emerald'], instrumento:['Instrumento','music','violet'], otro:['Otro','package','slate'] };
 var META_PRIOR={ '1':['Alta','bg-red-100 text-red-700'], '2':['Media','bg-amber-100 text-amber-700'], '3':['Baja','bg-slate-100 text-slate-500'] };
 
@@ -2322,8 +2323,8 @@ async function metInit(){
   try{
     var c=await dbGet('cajas','select=id&nombre=eq.Fondo de Metas&ambito=eq.proyecto&limit=1');
     MET.fondoId=c.length?c[0].id:false;
-    var cc=await dbGet('caja_categorias','select=id,nombre,tipo&nombre=in.(Actividad,Compra de metas)');
-    cc.forEach(function(x){ if(x.tipo==='ingreso') MET.catIng=x.id; if(x.tipo==='egreso') MET.catEgr=x.id; });
+    var cc=await dbGet('caja_categorias','select=id,nombre,tipo&nombre=in.(Actividad,Compra de metas,Gasto de actividad)');
+    cc.forEach(function(x){ if(x.nombre==='Actividad') MET.catIng=x.id; if(x.nombre==='Compra de metas') MET.catEgr=x.id; if(x.nombre==='Gasto de actividad') MET.catGasto=x.id; });
   }catch(e){ if(MET.fondoId===null) MET.fondoId=false; }
 }
 function metTermometro(asig, cot){
@@ -2380,14 +2381,13 @@ async function pintarMetas(){
     if(AC){
       if(!acts.length){ AC.innerHTML=vacio('party-popper','Sin actividades. Crea una para recaudar hacia las metas.'); }
       else AC.innerHTML=acts.map(function(a){
-        return '<div class="bg-white border border-slate-200 rounded-xl p-3 flex items-center gap-3">'+
+        var t=ACT_TIPOS[a.tipo]||ACT_TIPOS.otro;
+        return '<div onclick="perfilActividad(\''+a.id+'\')" class="bg-white border border-slate-200 rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:shadow-md transition">'+
+          '<div class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0"><i data-lucide="'+t[1]+'" class="w-4 h-4"></i></div>'+
           '<div class="flex-1 min-w-0"><div class="font-semibold text-slate-800 truncate">'+esc(a.nombre)+'</div>'+
-          '<div class="text-xs text-slate-500 truncate">'+(a.fecha?fecha(a.fecha):'Sin fecha')+(a.members?' · '+esc(nomShow(a.members)):'')+' · <span class="px-1.5 py-0.5 rounded-full '+(estCol[a.estado]||'')+'">'+(estLab[a.estado]||a.estado)+'</span></div></div>'+
-          '<div class="text-right flex-shrink-0"><div class="text-sm font-bold text-emerald-700">'+dinero(rec[a.id]||0)+'</div><div class="text-[10px] text-slate-400">recaudado</div></div>'+
-          '<div class="flex flex-col gap-1 flex-shrink-0">'+
-            '<button onclick="registrarAporte(\''+a.id+'\')" class="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg" title="Registrar ingreso"><i data-lucide="plus-circle" class="w-4 h-4"></i></button>'+
-            '<button onclick="formActividad(\''+a.id+'\')" class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400"><i data-lucide="pencil" class="w-4 h-4"></i></button>'+
-          '</div></div>';
+          '<div class="text-xs text-slate-500 truncate">'+(a.fecha?fecha(a.fecha):'Sin fecha')+' · <span class="px-1.5 py-0.5 rounded-full '+(estCol[a.estado]||'')+'">'+(estLab[a.estado]||a.estado)+'</span></div></div>'+
+          '<div class="text-right flex-shrink-0"><div class="text-sm font-bold '+((rec[a.id]||0)>=0?'text-emerald-700':'text-red-600')+'">'+dinero(rec[a.id]||0)+'</div><div class="text-[10px] text-slate-400">ganancia</div></div>'+
+          '<i data-lucide="chevron-right" class="w-5 h-5 text-slate-300 flex-shrink-0"></i></div>';
       }).join('');
       ri();
     }
@@ -2449,6 +2449,9 @@ function formActividad(id){
     modal('mAct', mHead((id?'Editar':'Nueva')+' actividad','mAct')+
       '<form id="fAct" class="p-4 space-y-3">'+
       '<div><label class="text-sm font-medium">Nombre *</label><input name="nombre" required value="'+esc(a.nombre||'')+'" placeholder="Ej: Kermés, Venta de comida" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+      '<div class="grid grid-cols-2 gap-3"><div><label class="text-sm font-medium">Tipo</label><select name="tipo" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg bg-white">'+Object.keys(ACT_TIPOS).map(function(k){return '<option value="'+k+'"'+((a.tipo||'otro')===k?' selected':'')+'>'+ACT_TIPOS[k][0]+'</option>';}).join('')+'</select></div>'+
+        '<div><label class="text-sm font-medium">Unidad</label><input name="unidad" value="'+esc(a.unidad||'')+'" placeholder="boletos, platos..." class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div></div>'+
+      '<div><label class="text-sm font-medium">Precio por unidad (L, opcional)</label><input name="precio_unitario" type="number" step="0.01" min="0" value="'+(a.precio_unitario!=null?a.precio_unitario:'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
       '<div class="grid grid-cols-2 gap-3"><div><label class="text-sm font-medium">Fecha</label><input name="fecha" type="date" value="'+esc(a.fecha||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
         '<div><label class="text-sm font-medium">Estado</label><select name="estado" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg bg-white">'+opEst+'</select></div></div>'+
       '<div><label class="text-sm font-medium">Responsable</label><select name="responsable_id" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg bg-white">'+opResp+'</select></div>'+
@@ -2459,7 +2462,7 @@ function formActividad(id){
       e.preventDefault(); var btn=e.target.querySelector('button[type=submit]'); btn.disabled=true;
       try{
         var fd=new FormData(e.target);
-        var b={ nombre:fd.get('nombre'), fecha:fd.get('fecha')||null, estado:fd.get('estado'), responsable_id:fd.get('responsable_id')||null, meta_recaudo:parseFloat(fd.get('meta_recaudo'))||null, descripcion:(fd.get('descripcion')||'').trim()||null };
+        var b={ nombre:fd.get('nombre'), tipo:fd.get('tipo')||'otro', unidad:(fd.get('unidad')||'').trim()||null, precio_unitario:parseFloat(fd.get('precio_unitario'))||null, fecha:fd.get('fecha')||null, estado:fd.get('estado'), responsable_id:fd.get('responsable_id')||null, meta_recaudo:parseFloat(fd.get('meta_recaudo'))||null, descripcion:(fd.get('descripcion')||'').trim()||null };
         if(id) await dbPatch('actividades','id=eq.'+id,b); else await dbPost('actividades',b);
         toast('Actividad guardada','success'); closeModal('mAct'); pintarMetas();
       }catch(err){ toast(err.message.slice(0,140),'error'); btn.disabled=false; }
@@ -2506,6 +2509,98 @@ async function comprarMeta(id){
 }
 async function cambiarEstadoMeta(id,est){ try{ await dbPatch('metas','id=eq.'+id,{estado:est}); toast('Actualizado','success'); closeModal('mMeta'); pintarMetas(); }catch(e){ toast(e.message.slice(0,120),'error'); } }
 async function borrarMeta(id){ if(!confirm('¿Eliminar esta meta? (No borra los movimientos de tesorería ya registrados)')) return; try{ await dbDel('metas','id=eq.'+id); toast('Eliminada','success'); closeModal('mMeta'); pintarMetas(); }catch(e){ toast(e.message.slice(0,120),'error'); } }
+
+async function perfilActividad(id){
+  await metInit();
+  var a=(await dbGet('actividades','id=eq.'+id+'&select=*,members(nombre,nombre_display)'))[0]; if(!a) return;
+  var res=(await dbGet('v_actividad_resumen','select=*&actividad_id=eq.'+id))[0]||{vendido:0,invertido:0,ganancia:0};
+  var parts=await dbGet('actividad_participantes','select=*,members(nombre,nombre_display)&actividad_id=eq.'+id+'&order=created_at');
+  var gestion=puede(['admin','pastor','tesorero','lider']);
+  var t=ACT_TIPOS[a.tipo]||ACT_TIPOS.otro;
+  var vendido=Number(res.vendido), invertido=Number(res.invertido), ganancia=Number(res.ganancia);
+  var margen=vendido>0?Math.round(ganancia/vendido*100):0;
+  var kpi=function(lab,val,col){ return '<div class="bg-slate-50 rounded-xl p-3 text-center"><div class="text-[11px] text-slate-500">'+lab+'</div><div class="text-base font-bold '+(col||'text-slate-800')+'">'+val+'</div></div>'; };
+  var totAsig=0, totVend=0, totPag=0;
+  var partHtml = parts.length ? parts.map(function(p){
+    totAsig+=Number(p.asignados); totVend+=Number(p.vendidos); totPag+=Number(p.pagado);
+    var quien=p.members?nomShow(p.members):(p.nombre_externo||'\u2014');
+    var esperado = a.precio_unitario ? Number(p.vendidos)*Number(a.precio_unitario) : null;
+    var pend = esperado!=null ? esperado-Number(p.pagado) : null;
+    var pagOk = esperado!=null && Number(p.pagado) >= esperado-0.001;
+    return '<div class="border border-slate-200 rounded-xl p-3">'+
+      '<div class="flex items-center justify-between gap-2"><span class="font-medium text-slate-800 truncate">'+esc(quien)+'</span>'+
+        (esperado!=null?(pagOk?'<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-semibold flex-shrink-0">Pag\u00f3</span>':'<span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold flex-shrink-0">Debe '+dinero(pend)+'</span>'):'')+'</div>'+
+      '<div class="grid grid-cols-3 gap-1 mt-2 text-center text-xs"><div><div class="text-slate-400">Asignados</div><div class="font-semibold text-slate-700">'+p.asignados+'</div></div><div><div class="text-slate-400">Vendidos</div><div class="font-semibold text-slate-700">'+p.vendidos+'</div></div><div><div class="text-slate-400">Pagado</div><div class="font-semibold text-slate-700">'+dinero(p.pagado)+'</div></div></div>'+
+      (gestion?'<div class="flex gap-1 mt-2"><button onclick="pagoParticipante(\''+p.id+'\',\''+id+'\')" class="flex-1 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-medium">Registrar pago</button><button onclick="formParticipante(\''+id+'\',\''+p.id+'\')" class="px-3 py-1.5 bg-slate-100 rounded-lg text-xs">Editar</button></div>':'')+
+    '</div>';
+  }).join('') : '<p class="text-sm text-slate-400">Sin vendedores registrados.</p>';
+  var totales = parts.length ? '<div class="flex justify-between text-xs text-slate-500 mt-2 px-1"><span>Totales:</span><span>'+totAsig+' asignados · '+totVend+' vendidos · '+dinero(totPag)+' pagado</span></div>' : '';
+  var body=mHead(esc(a.nombre),'mActD')+
+    '<div class="p-4">'+
+      '<div class="flex items-center gap-2 text-sm text-slate-500 mb-3 flex-wrap"><i data-lucide="'+t[1]+'" class="w-4 h-4"></i>'+esc(t[0])+(a.fecha?' \u00b7 '+fecha(a.fecha):'')+(a.members?' \u00b7 '+esc(nomShow(a.members)):'')+(a.precio_unitario?' \u00b7 '+dinero(a.precio_unitario)+'/'+esc(a.unidad||'u'):'')+'</div>'+
+      '<div class="grid grid-cols-2 gap-2 mb-3">'+kpi('Vendido',dinero(vendido),'text-emerald-700')+kpi('Invertido',dinero(invertido),'text-red-600')+kpi('Ganancia',dinero(ganancia),ganancia>=0?'text-slate-800':'text-red-600')+kpi('Margen',margen+'%','text-indigo-600')+'</div>'+
+      (gestion?'<div class="flex flex-wrap gap-2 mb-4"><button onclick="registrarAporte(\''+id+'\')" class="flex-1 py-2 bg-emerald-600 text-white rounded-xl text-sm font-medium">+ Ingreso</button><button onclick="registrarGastoActividad(\''+id+'\')" class="flex-1 py-2 bg-red-500 text-white rounded-xl text-sm font-medium">+ Gasto / factura</button></div>':'')+
+      '<div class="flex items-center justify-between mb-2"><h4 class="font-bold text-slate-800">Vendedores</h4>'+(gestion?'<button onclick="formParticipante(\''+id+'\')" class="text-sm text-indigo-600 font-medium flex items-center gap-1"><i data-lucide="user-plus" class="w-4 h-4"></i>Agregar</button>':'')+'</div>'+
+      '<div class="space-y-2">'+partHtml+'</div>'+totales+
+      (gestion?'<button onclick="formActividad(\''+id+'\')" class="w-full mt-4 py-2 text-slate-500 text-sm">Editar actividad</button>':'')+
+    '</div>';
+  modal('mActD', body);
+}
+function formParticipante(actId, pid){
+  (async function(){
+    var p={}; if(pid){ p=(await dbGet('actividad_participantes','id=eq.'+pid+'&select=*'))[0]||{}; }
+    var mem=(S.cache.members&&S.cache.members.length)?S.cache.members:await dbGet('members','select=id,nombre,nombre_display&order=nombre');
+    var opMem='<option value="">\u2014 Externo / no miembro \u2014</option>'+mem.map(function(x){return '<option value="'+x.id+'"'+(p.member_id===x.id?' selected':'')+'>'+esc(nomShow(x))+'</option>';}).join('');
+    modal('mPart', mHead((pid?'Editar':'Agregar')+' vendedor','mPart')+
+      '<form id="fPart" class="p-4 space-y-3">'+
+      '<div><label class="text-sm font-medium">Miembro</label><select name="member_id" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg bg-white">'+opMem+'</select></div>'+
+      '<div><label class="text-sm font-medium">Nombre (si no es miembro)</label><input name="nombre_externo" value="'+esc(p.nombre_externo||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+      '<div class="grid grid-cols-2 gap-3"><div><label class="text-sm font-medium">Asignados</label><input name="asignados" type="number" min="0" value="'+(p.asignados!=null?p.asignados:0)+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
+        '<div><label class="text-sm font-medium">Vendidos</label><input name="vendidos" type="number" min="0" value="'+(p.vendidos!=null?p.vendidos:0)+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div></div>'+
+      '<p class="text-[11px] text-slate-400">El monto pagado se registra con el bot\u00f3n \u201cRegistrar pago\u201d (entra al fondo).</p>'+
+      mFoot('mPart',pid?'Guardar':'Agregar')+(pid?'<button type="button" onclick="borrarParticipante(\''+pid+'\',\''+actId+'\')" class="w-full mt-2 py-2 text-red-600 text-sm">Quitar vendedor</button>':'')+'</form>');
+    document.getElementById('fPart').onsubmit=async function(e){
+      e.preventDefault(); var btn=e.target.querySelector('button[type=submit]'); btn.disabled=true;
+      try{
+        var fd=new FormData(e.target);
+        var mid=fd.get('member_id')||null, ext=(fd.get('nombre_externo')||'').trim()||null;
+        if(!mid&&!ext){ toast('Indica un miembro o nombre','warning'); btn.disabled=false; return; }
+        var b={ actividad_id:actId, member_id:mid, nombre_externo:ext, asignados:parseInt(fd.get('asignados'),10)||0, vendidos:parseInt(fd.get('vendidos'),10)||0 };
+        if(pid) await dbPatch('actividad_participantes','id=eq.'+pid,b); else await dbPost('actividad_participantes',b);
+        toast('Guardado','success'); closeModal('mPart'); perfilActividad(actId);
+      }catch(err){ toast(err.message.slice(0,140),'error'); btn.disabled=false; }
+    };
+  })();
+}
+async function pagoParticipante(pid, actId){
+  await metInit();
+  if(!MET.fondoId){ toast('No se encontró la caja del fondo','error'); return; }
+  var p=(await dbGet('actividad_participantes','id=eq.'+pid+'&select=*,members(nombre,nombre_display)'))[0]; if(!p) return;
+  var quien=p.members?nomShow(p.members):(p.nombre_externo||'vendedor');
+  var val=prompt('¿Cuánto entregó '+quien+'? (entra al fondo como ingreso)','');
+  if(val===null) return;
+  var n=parseFloat(val); if(isNaN(n)||n<=0){ toast('Monto inválido','warning'); return; }
+  try{
+    await dbPost('treasury',{ caja_id:MET.fondoId, tipo:'ingreso', categoria_id:MET.catIng||null, actividad_id:actId, monto:n, fecha:hoy(), metodo:'efectivo', descripcion:'Pago vendedor: '+quien, registrado_por:(S.user?S.user.id:null) });
+    await dbPatch('actividad_participantes','id=eq.'+pid,{ pagado:Number(p.pagado)+n });
+    toast('Pago registrado','success'); perfilActividad(actId);
+  }catch(e){ toast(e.message.slice(0,150),'error'); }
+}
+async function registrarGastoActividad(actId){
+  await metInit();
+  if(!MET.fondoId){ toast('No se encontró la caja del fondo','error'); return; }
+  var monto=prompt('Registrar gasto de la actividad.\n¿Monto? (L)','');
+  if(monto===null) return;
+  var n=parseFloat(monto); if(isNaN(n)||n<=0){ toast('Monto inválido','warning'); return; }
+  var desc=prompt('¿En qué se gastó? (ej. ingredientes, impresión)','');
+  if(desc===null) return; desc=(desc||'').trim()||'Gasto de actividad';
+  var factura=prompt('N.º de factura o recibo (opcional):','');
+  try{
+    await dbPost('treasury',{ caja_id:MET.fondoId, tipo:'egreso', categoria_id:(MET.catGasto||MET.catEgr)||null, actividad_id:actId, monto:n, fecha:hoy(), metodo:'efectivo', descripcion:desc, referencia:(factura||'').trim()||null, registrado_por:(S.user?S.user.id:null) });
+    toast('Gasto registrado','success'); perfilActividad(actId);
+  }catch(e){ toast(e.message.slice(0,150),'error'); }
+}
+async function borrarParticipante(pid, actId){ if(!confirm('¿Quitar este vendedor?')) return; try{ await dbDel('actividad_participantes','id=eq.'+pid); toast('Quitado','success'); closeModal('mPart'); perfilActividad(actId); }catch(e){ toast(e.message.slice(0,120),'error'); } }
 
 async function view_stats(){
   var p=document.getElementById('page');
