@@ -125,11 +125,11 @@ function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){retu
 function fecha(f){ if(!f) return '-'; try{ var d=(typeof f==='string'&&f.length===10&&f.indexOf('T')===-1)?new Date(f+'T12:00:00'):new Date(f); return d.toLocaleDateString('es-HN',{day:'2-digit',month:'2-digit',year:'numeric'}); }catch(e){return '-';} }
 function dinero(n){ if(n==null) return 'L 0.00'; return 'L '+Number(n).toLocaleString('es-HN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function edadRango(fnac){
-  if(!fnac) return {edad:null,rango:'Sin fecha',color:'slate'};
+  if(!fnac) return {edad:null,rango:'Sin fecha',color:'slate',grupo:null};
   var hoy=new Date(), n=new Date(fnac+'T00:00:00');
   var e=hoy.getFullYear()-n.getFullYear(), m=hoy.getMonth()-n.getMonth();
   if(m<0||(m===0&&hoy.getDate()<n.getDate())) e--;
-  if(e<0) return {edad:null,rango:'Sin fecha',color:'slate'};
+  if(e<0) return {edad:null,rango:'Sin fecha',color:'slate',grupo:null};
   var r,c;
   if(e<=11){r='Niños';c='sky';}
   else if(e<=17){r='Adolescentes';c='teal';}
@@ -137,7 +137,7 @@ function edadRango(fnac){
   else if(e<=39){r='Adultos jóvenes';c='violet';}
   else if(e<=59){r='Adultos';c='amber';}
   else{r='Adultos mayores';c='rose';}
-  return {edad:e,rango:r,color:c};
+  return {edad:e,rango:r,color:c,grupo:(e<18?'menor':'mayor')};
 }
 function hoy(){ var d=new Date(); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
 function nomShow(m){ if(!m) return ''; var d=m.nombre_display; return (d&&(''+d).trim())?(''+d).trim():(m.nombre||''); }
@@ -415,7 +415,9 @@ async function pintarAnalitica(){
     var cols={'Niños':'#0ea5e9','Adolescentes':'#14b8a6','Jóvenes':'#6366f1','Adultos jóvenes':'#8b5cf6','Adultos':'#f59e0b','Adultos mayores':'#f43f5e','Sin fecha':'#94a3b8'};
     var ed=(await rpcJson('stats_edades')).filter(function(d){return d.rango!=='Sin fecha'||d.cantidad>0;});
     var maxEd=Math.max.apply(null,[1].concat(ed.map(function(d){return Number(d.cantidad);})));
-    out+=card('Rangos de edad','users', ed.length?ed.map(function(d){return barra(d.rango,Number(d.cantidad),maxEd,cols[d.rango]);}).join(''):'<p class="text-sm text-slate-400">Sin datos.</p>');
+    var menores=0,mayores=0; ed.forEach(function(d){ if(d.rango==='Niños'||d.rango==='Adolescentes') menores+=Number(d.cantidad); else if(d.rango!=='Sin fecha') mayores+=Number(d.cantidad); });
+    var grpHtml='<div class="grid grid-cols-2 gap-2 mb-3"><div class="bg-teal-50 rounded-xl py-2.5 text-center"><div class="text-xl font-bold text-teal-700">'+menores+'</div><div class="text-[11px] text-slate-500">Menores de edad (0-17)</div></div><div class="bg-indigo-50 rounded-xl py-2.5 text-center"><div class="text-xl font-bold text-indigo-700">'+mayores+'</div><div class="text-[11px] text-slate-500">Mayores de edad (18+)</div></div></div>';
+    out+=card('Rangos de edad','users', ed.length?(grpHtml+ed.map(function(d){return barra(edadLabel(d.rango),Number(d.cantidad),maxEd,cols[d.rango]);}).join('')):'<p class="text-sm text-slate-400">Sin datos.</p>');
   }catch(e){}
   var showOfr=finAuditor();
   var fila=function(nombre, asist, ofr, extra){
@@ -514,6 +516,8 @@ function pillSit(s){ if(!s||s==='activo') return ''; var t=SITUACIONES[s]||SITUA
 
 var MEMB={ all:[], sectores:[], filt:{situacion:[],genero:[],edad:[],sector:[],ministerio:[],casa:[]}, _opts:{} };
 var EDAD_RANGOS=['Niños','Adolescentes','Jóvenes','Adultos jóvenes','Adultos','Adultos mayores','Sin fecha'];
+var EDAD_INFO={ 'Niños':'0-11','Adolescentes':'12-17','Jóvenes':'18-29','Adultos jóvenes':'30-39','Adultos':'40-59','Adultos mayores':'60+' };
+function edadLabel(r){ return EDAD_INFO[r]?(r+' ('+EDAD_INFO[r]+')'):r; }
 
 async function view_members(){
   var p=document.getElementById('page');
@@ -549,7 +553,7 @@ function mMatch(m){
   var F=MEMB.filt;
   if(F.situacion.length && F.situacion.indexOf(m.situacion||'activo')===-1) return false;
   if(F.genero.length && F.genero.indexOf(m.genero||'')===-1) return false;
-  if(F.edad.length){ var r=edadRango(m.fecha_nacimiento).rango; if(F.edad.indexOf(r)===-1) return false; }
+  if(F.edad.length){ var er=edadRango(m.fecha_nacimiento); var ok=F.edad.some(function(v){ return v==='Menores de edad'?er.grupo==='menor':(v==='Mayores de edad'?er.grupo==='mayor':er.rango===v); }); if(!ok) return false; }
   if(F.sector.length && F.sector.indexOf((m.sector||'').trim())===-1) return false;
   if(F.ministerio.length){ var ms=(m.member_teams||[]).map(function(t){return t.teams?t.teams.id:null;}); if(!F.ministerio.some(function(id){return ms.indexOf(id)!==-1;})) return false; }
   if(F.casa.length){ var hs=(m.member_houses||[]).map(function(h){return h.houses?h.houses.id:null;}); if(!F.casa.some(function(id){return hs.indexOf(id)!==-1;})) return false; }
@@ -616,7 +620,7 @@ function renderFiltrosBody(){
   MEMB._opts={
     situacion:[{v:'activo',label:'Activos'},{v:'inactivo',label:'Inactivos'}],
     genero:[{v:'M',label:'Hombres'},{v:'F',label:'Mujeres'}],
-    edad:EDAD_RANGOS.filter(function(r){return edc[r];}).map(function(r){return {v:r,label:r,count:edc[r]};}),
+    edad:[{v:'Menores de edad',label:'Menores (0-17)',count:(edc['Niños']||0)+(edc['Adolescentes']||0)},{v:'Mayores de edad',label:'Mayores (18+)',count:(edc['Jóvenes']||0)+(edc['Adultos jóvenes']||0)+(edc['Adultos']||0)+(edc['Adultos mayores']||0)}].concat(EDAD_RANGOS.filter(function(r){return edc[r];}).map(function(r){return {v:r,label:edadLabel(r),count:edc[r]};})),
     sector:MEMB.sectores.map(function(x){return {v:x,label:x};}),
     ministerio:(S.cache.teams||[]).map(function(t){return {v:t.id,label:t.nombre};}),
     casa:(S.cache.houses||[]).map(function(h){return {v:h.id,label:h.nombre};})
@@ -2667,13 +2671,30 @@ async function view_stats(){
       dbGet('v_stats_decisiones','select=*&order=orden'),
       dbGet('v_stats_decisiones_mes','select=*&order=periodo'),
       Promise.resolve([]),
-      dbGet('v_stats_en_riesgo','select=*&limit=60')
+      dbGet('v_stats_en_riesgo','select=*&limit=60'),
+      finAuditor()?dbGet('v_cajas_saldos','select=id,nombre&order=orden.asc,nombre.asc'):Promise.resolve([])
     ]);
-    render_stats(d[0][0]||{}, d[1], d[2], d[3], d[4][0]||{}, d[5], d[6], d[7], d[8], d[9], d[10], d[11]);
+    render_stats(d[0][0]||{}, d[1], d[2], d[3], d[4][0]||{}, d[5], d[6], d[7], d[8], d[9], d[10], d[11], d[12]);
   }catch(e){ errorPagina(e); }
 }
 
-function render_stats(mem, etapas, crec, asis, vis, casas, finMes, finCat, dec, decMes, ingPast, riesgo){
+function finBox(finMes){
+  var filasMes=finMes.filter(function(x){return Number(x.ingresos)||Number(x.egresos);}).map(function(x){ var neto=Number(x.neto);
+    return '<div class="flex items-center justify-between text-xs py-1.5 border-b border-slate-50 last:border-0"><span class="w-12 text-slate-600 font-medium">'+esc(x.etiqueta)+'</span><span class="flex-1 text-right text-emerald-600">'+dinero(x.ingresos)+'</span><span class="flex-1 text-right text-red-500">'+dinero(x.egresos)+'</span><span class="flex-1 text-right font-semibold '+(neto>=0?'text-slate-800':'text-red-600')+'">'+dinero(neto)+'</span></div>'; }).join('');
+  var desgloseMes='<div class="mt-3 pt-2 border-t border-slate-100"><div class="flex items-center justify-between text-[10px] uppercase tracking-wide text-slate-400 mb-1 font-semibold"><span class="w-12">Mes</span><span class="flex-1 text-right">Ingresos</span><span class="flex-1 text-right">Egresos</span><span class="flex-1 text-right">Balance</span></div>'+filasMes+'</div>';
+  var hay=finMes.some(function(x){return Number(x.ingresos)>0||Number(x.egresos)>0;});
+  if(!hay) return '<p class="text-sm text-slate-400 py-4 text-center">Sin movimientos en esta caja (últimos 12 meses).</p>';
+  return barChart(finMes.map(function(x){return x.etiqueta;}),
+      [{data:finMes.map(function(x){return Number(x.ingresos);}),color:GC.emerald},
+       {data:finMes.map(function(x){return Number(x.egresos);}),color:GC.red}])+
+    legend([{label:'Ingresos',color:GC.emerald},{label:'Egresos',color:GC.red}])+desgloseMes;
+}
+function filtrarFinanzasCaja(cajaId){
+  var el=document.getElementById('finContent'); if(!el) return;
+  el.innerHTML='<div class="text-center py-6 text-slate-400"><i data-lucide="loader-circle" class="w-6 h-6 mx-auto animate-spin"></i></div>'; ri();
+  rpcJson('stats_finanzas_mes',{p_caja:cajaId||null}).then(function(d){ el.innerHTML=finBox(d); ri(); }).catch(function(){ el.innerHTML='<p class="text-sm text-red-500 py-4 text-center">No se pudo filtrar.</p>'; });
+}
+function render_stats(mem, etapas, crec, asis, vis, casas, finMes, finCat, dec, decMes, ingPast, riesgo, finCajas){
   var p=document.getElementById('page');
   var h='';
 
@@ -2752,14 +2773,9 @@ function render_stats(mem, etapas, crec, asis, vis, casas, finMes, finCat, dec, 
   if(finAuditor() && finMes){
     var hayFin=finMes.some(function(x){ return Number(x.ingresos)>0||Number(x.egresos)>0; });
     if(hayFin){
-      var filasMes=finMes.filter(function(x){return Number(x.ingresos)||Number(x.egresos);}).map(function(x){ var neto=Number(x.neto);
-        return '<div class="flex items-center justify-between text-xs py-1.5 border-b border-slate-50 last:border-0"><span class="w-12 text-slate-600 font-medium">'+esc(x.etiqueta)+'</span><span class="flex-1 text-right text-emerald-600">'+dinero(x.ingresos)+'</span><span class="flex-1 text-right text-red-500">'+dinero(x.egresos)+'</span><span class="flex-1 text-right font-semibold '+(neto>=0?'text-slate-800':'text-red-600')+'">'+dinero(neto)+'</span></div>'; }).join('');
-      var desgloseMes='<div class="mt-3 pt-2 border-t border-slate-100"><div class="flex items-center justify-between text-[10px] uppercase tracking-wide text-slate-400 mb-1 font-semibold"><span class="w-12">Mes</span><span class="flex-1 text-right">Ingresos</span><span class="flex-1 text-right">Egresos</span><span class="flex-1 text-right">Balance</span></div>'+filasMes+'</div>';
+      var selCaja=(finCajas&&finCajas.length)?'<select onchange="filtrarFinanzasCaja(this.value)" class="w-full mb-3 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"><option value="">Todas las cajas</option>'+finCajas.map(function(c){return '<option value="'+c.id+'">'+esc(c.nombre)+'</option>';}).join('')+'</select>':'';
       h+='<div class="mb-4">'+card('Ingresos y egresos','bar-chart-3',
-        barChart(finMes.map(function(x){return x.etiqueta;}),
-          [{data:finMes.map(function(x){return Number(x.ingresos);}),color:GC.emerald},
-           {data:finMes.map(function(x){return Number(x.egresos);}),color:GC.red}])+
-        legend([{label:'Ingresos',color:GC.emerald},{label:'Egresos',color:GC.red}])+desgloseMes,
+        selCaja+'<div id="finContent">'+finBox(finMes)+'</div>',
         '<span class="text-xs text-slate-400">últimos 12 meses</span>')+'</div>';
 
       var ingCat=finCat.filter(function(c){ return c.tipo==='ingreso'; });
