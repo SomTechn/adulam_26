@@ -279,6 +279,7 @@ function puede(roles){ return roles.indexOf(rol())!==-1; }
 /* ---------- navegación ---------- */
 var MENU = [
   { id:'dashboard',    icon:'layout-dashboard', label:'Dashboard',      roles:['admin','pastor','tesorero','fiscal','lider','servidor','miembro'] },
+  { id:'alertas',      icon:'bell-ring',        label:'Alertas',        roles:['admin','pastor','tesorero','fiscal','lider','servidor'] },
   { id:'stats',        icon:'bar-chart-3',      label:'Estadísticas',   roles:['admin','pastor','tesorero','fiscal','lider'] },
   { id:'members',      icon:'users',            label:'Membresía',      roles:['admin','pastor','lider','servidor'] },
   { id:'visitors',     icon:'user-plus',        label:'Visitas',        roles:['admin','pastor','lider','servidor'] },
@@ -2602,6 +2603,53 @@ async function registrarGastoActividad(actId){
 }
 async function borrarParticipante(pid, actId){ if(!confirm('¿Quitar este vendedor?')) return; try{ await dbDel('actividad_participantes','id=eq.'+pid); toast('Quitado','success'); closeModal('mPart'); perfilActividad(actId); }catch(e){ toast(e.message.slice(0,120),'error'); } }
 
+/* ---------- ALERTAS ---------- */
+async function view_alertas(){
+  var p=document.getElementById('page');
+  var gm=puede(['admin','pastor','lider','servidor']), fin=finAuditor();
+  p.innerHTML=(gm?'<div id="alMiembros" class="mb-6"></div>':'')+(fin?'<div id="alFin"></div>':'')+
+    (!gm&&!fin?vacio('bell','Sin alertas para tu rol.'):'');
+  ri();
+  if(gm){
+    try{
+      var riesgo=await dbGet('v_stats_en_riesgo','select=*&limit=100');
+      var tier=function(f){ return f>15?['red','#dc2626']:(f>6?['orange','#ea580c']:['yellow','#ca8a04']); };
+      var lista = riesgo.length ? riesgo.map(function(r){ var f=Number(r.faltas)||3, t=tier(f);
+        return '<div class="flex items-center gap-3 p-3 rounded-xl border bg-'+t[0]+'-50 border-'+t[0]+'-200 mb-2">'+
+          '<div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style="background:'+t[1]+'22;color:'+t[1]+'"><i data-lucide="user-minus" class="w-5 h-5"></i></div>'+
+          '<div class="flex-1 min-w-0"><div class="font-semibold text-slate-800 truncate">'+esc(r.nombre)+'</div>'+
+          '<div class="text-xs text-slate-500">Falt\u00f3 a '+f+' servicio'+(f!==1?'s':'')+' seguidos \u00b7 \u00falt. asist. '+fecha(r.ultima)+'</div></div>'+
+          (r.telefono?'<a href="'+waLink(r.telefono,'\u00a1Hola '+r.nombre.split(' ')[0]+'! Te extra\u00f1amos en la iglesia. \u00bfC\u00f3mo est\u00e1s? Queremos saber de ti. \ud83d\ude4f')+'" target="_blank" class="p-2 text-emerald-600 hover:bg-emerald-100 rounded-lg flex-shrink-0"><i data-lucide="message-circle" class="w-5 h-5"></i></a>':'')+'</div>';
+      }).join('') : '<div class="bg-white rounded-2xl border border-slate-200 p-4 text-sm text-slate-400 flex items-center gap-2"><i data-lucide="check-circle" class="w-5 h-5 text-emerald-500"></i>Nadie lleva 3 servicios seguidos sin asistir.</div>';
+      var el=document.getElementById('alMiembros');
+      if(el) el.innerHTML='<h3 class="text-lg font-bold text-slate-800 mb-1 flex items-center gap-2"><i data-lucide="user-minus" class="w-5 h-5 text-rose-500"></i>Miembros en riesgo</h3>'+
+        '<p class="text-xs text-slate-500 mb-3">Amarillo: 3+ \u00b7 Naranja: 6+ \u00b7 Rojo: 15+ servicios seguidos sin asistir.</p>'+lista;
+      ri();
+    }catch(e){}
+  }
+  if(fin){ await pintarAlertasFin(); }
+}
+async function pintarAlertasFin(){
+  var el=document.getElementById('alFin'); if(!el) return;
+  var items=[];
+  try{ (await dbGet('v_cajas_saldos','select=nombre,saldo&saldo=lt.0')).forEach(function(c){
+    items.push(['wallet','red','Caja en negativo','La caja "'+esc(c.nombre)+'" tiene saldo '+dinero(c.saldo)+'.']); }); }catch(e){}
+  try{ (await dbGet('metas','select=nombre,fecha_meta,cotizacion,asignado&estado=eq.activa&fecha_meta=lt.'+hoy())).forEach(function(m){
+    items.push(['target','orange','Meta vencida','"'+esc(m.nombre)+'" pas\u00f3 su fecha l\u00edmite ('+fecha(m.fecha_meta)+') con '+dinero(m.asignado)+' de '+dinero(m.cotizacion)+'.']); }); }catch(e){}
+  try{ (await dbGet('actividad_participantes','select=*,members(nombre,nombre_display),actividades(nombre,precio_unitario)')).forEach(function(pp){
+    var pr=(pp.actividades&&pp.actividades.precio_unitario)?Number(pp.actividades.precio_unitario):0;
+    if(pr>0){ var deuda=Number(pp.vendidos)*pr-Number(pp.pagado); if(deuda>0.001){ var q=pp.members?nomShow(pp.members):(pp.nombre_externo||'Vendedor');
+      items.push(['user-x','amber','Pago pendiente',esc(q)+' debe '+dinero(deuda)+' de "'+esc(pp.actividades?pp.actividades.nombre:'actividad')+'".']); } } }); }catch(e){}
+  var col={red:['bg-red-50','border-red-200','#dc2626'],orange:['bg-orange-50','border-orange-200','#ea580c'],amber:['bg-amber-50','border-amber-200','#d97706']};
+  var html = items.length ? items.map(function(a){ var c=col[a[1]]||col.amber;
+    return '<div class="flex items-start gap-3 p-3 rounded-xl border '+c[0]+' '+c[1]+' mb-2">'+
+      '<div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style="background:'+c[2]+'22;color:'+c[2]+'"><i data-lucide="'+a[0]+'" class="w-4 h-4"></i></div>'+
+      '<div class="flex-1 min-w-0"><div class="font-semibold text-slate-800 text-sm">'+a[2]+'</div><div class="text-xs text-slate-600">'+a[3]+'</div></div></div>';
+  }).join('') : '<div class="bg-white rounded-2xl border border-slate-200 p-4 text-sm text-slate-400 flex items-center gap-2"><i data-lucide="check-circle" class="w-5 h-5 text-emerald-500"></i>Sin alertas financieras por ahora.</div>';
+  el.innerHTML='<h3 class="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><i data-lucide="alert-triangle" class="w-5 h-5 text-amber-500"></i>Alertas financieras</h3>'+html;
+  ri();
+}
+
 async function view_stats(){
   var p=document.getElementById('page');
   if(!puede(['admin','pastor','tesorero','fiscal','lider'])){ p.innerHTML=vacio('lock','No tienes acceso a las estadísticas.'); ri(); return; }
@@ -2750,24 +2798,20 @@ function render_stats(mem, etapas, crec, asis, vis, casas, finMes, finCat, dec, 
       '<span class="text-xs text-slate-400">vs. '+esc(cmP.etiqueta)+'</span>')+'</div>';
   }
 
-  /* --- Miembros en riesgo por inasistencia --- */
+  /* --- Miembros en riesgo (resumen; detalle en Alertas) --- */
   if(puede(['admin','pastor','lider','servidor'])){
     if(riesgo && riesgo.length){
-      var tier=function(f){ return f>15?['red','#dc2626']:(f>6?['orange','#ea580c']:['yellow','#ca8a04']); };
-      var listaR=riesgo.slice(0,20).map(function(r){
-        var f=Number(r.faltas)||3, t=tier(f);
-        return '<div class="flex items-center gap-3 p-2.5 rounded-xl border bg-'+t[0]+'-50 border-'+t[0]+'-200 mb-1.5">'+
-          '<div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style="background:'+t[1]+'22;color:'+t[1]+'"><i data-lucide="user-minus" class="w-4 h-4"></i></div>'+
-          '<div class="flex-1 min-w-0"><div class="text-sm font-medium text-slate-800 truncate">'+esc(r.nombre)+'</div>'+
-          '<div class="text-xs text-slate-500">Falt\u00f3 a '+f+' servicio'+(f!==1?'s':'')+' seguidos \u00b7 \u00falt. asist. '+fecha(r.ultima)+'</div></div>'+
-          (r.telefono?'<a href="'+waLink(r.telefono,'\u00a1Hola '+r.nombre.split(' ')[0]+'! Te extra\u00f1amos en la iglesia. \u00bfC\u00f3mo est\u00e1s? Queremos saber de ti. \ud83d\ude4f')+'" target="_blank" class="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg flex-shrink-0"><i data-lucide="message-circle" class="w-5 h-5"></i></a>':'')+'</div>';
-      }).join('');
+      var c6=riesgo.filter(function(r){return Number(r.faltas)>6;}).length;
+      var c15=riesgo.filter(function(r){return Number(r.faltas)>15;}).length;
       h+='<div class="mb-4">'+card('Miembros en riesgo','user-minus',
-        '<p class="text-xs text-slate-500 mb-1">'+riesgo.length+' miembro'+(riesgo.length!==1?'s':'')+' sin asistir a los \u00faltimos 3 servicios seguidos.</p>'+
-        '<div class="flex flex-wrap gap-x-3 gap-y-1 mb-2 text-[11px] text-slate-500"><span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full" style="background:#ca8a04"></span>3+</span><span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full" style="background:#ea580c"></span>6+</span><span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full" style="background:#dc2626"></span>15+ servicios</span></div>'+
-        '<div>'+listaR+'</div>'+(riesgo.length>20?'<p class="text-xs text-slate-400 mt-2 text-center">y '+(riesgo.length-20)+' m\u00e1s</p>':''))+'</div>';
+        '<div class="grid grid-cols-3 gap-2 text-center">'+
+          '<div class="bg-yellow-50 rounded-xl py-3"><div class="text-2xl font-bold" style="color:#ca8a04">'+riesgo.length+'</div><div class="text-[11px] text-slate-500">3+ faltas</div></div>'+
+          '<div class="bg-orange-50 rounded-xl py-3"><div class="text-2xl font-bold" style="color:#ea580c">'+c6+'</div><div class="text-[11px] text-slate-500">6+ faltas</div></div>'+
+          '<div class="bg-red-50 rounded-xl py-3"><div class="text-2xl font-bold" style="color:#dc2626">'+c15+'</div><div class="text-[11px] text-slate-500">15+ faltas</div></div>'+
+        '</div>'+
+        '<button onclick="ir(\'alertas\')" class="w-full mt-3 py-2 text-sm text-indigo-600 font-medium flex items-center justify-center gap-1">Ver detalle en Alertas <i data-lucide="arrow-right" class="w-4 h-4"></i></button>')+'</div>';
     } else {
-      h+='<div class="mb-4">'+card('Miembros en riesgo','user-check',chartEmpty('user-check','Aqu\u00ed aparecer\u00e1n los miembros que faltaron a los 3 servicios m\u00e1s recientes seguidos, con un bot\u00f3n para contactarlos. Se activa a medida que registras asistencia.'))+'</div>';
+      h+='<div class="mb-4">'+card('Miembros en riesgo','user-check',chartEmpty('user-check','Aqu\u00ed ver\u00e1s el n\u00famero de miembros que faltaron a 3+ servicios seguidos. El detalle est\u00e1 en el m\u00f3dulo Alertas.'))+'</div>';
     }
   }
 
