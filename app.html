@@ -2916,8 +2916,8 @@ function mesActual(){ return new Date().toISOString().slice(0,7); }
 function rangoMes(m){ var p=String(m||mesActual()).split('-'), a=parseInt(p[0],10), n=parseInt(p[1],10); return [p[0]+'-'+p[1]+'-01', new Date(a,n,0).toISOString().slice(0,10)]; }
 function uid4(){ try{ return crypto.randomUUID(); }catch(e){ return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){var r=Math.random()*16|0;return (c==='x'?r:(r&0x3|0x8)).toString(16);}); } }
 
-function finAdmin(){ return puede(['admin','pastor','tesorero']); }
-function finAuditor(){ return puede(['admin','pastor','tesorero','fiscal']); }
+function finAdmin(){ return puede(['admin','pastor']); }
+function finAuditor(){ return puede(['admin','pastor']); }
 function esResp(c){ if(!c||!S.user) return false; if(c.soy_responsable) return true; return !!(c.responsable_id && c.responsable_id===S.user.id); }
 function puedeMover(c){ if(finAdmin()) return true; if(!c) return false; if(typeof c.puedo_escribir!=='undefined') return !!c.puedo_escribir; return esResp(c); }
 function cajaPorId(id){ return TZ.cajas.filter(function(c){ return c.id===id; })[0]||null; }
