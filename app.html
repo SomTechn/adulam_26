@@ -139,6 +139,25 @@ function edadRango(fnac){
   else{r='Adultos mayores';c='rose';}
   return {edad:e,rango:r,color:c,grupo:(e<18?'menor':'mayor')};
 }
+function antiguedad(fing){
+  if(!fing) return {texto:null,rango:'Sin fecha',color:'slate',meses:null};
+  var hoy=new Date(), n=new Date(fing+'T00:00:00');
+  if(n>hoy) return {texto:null,rango:'Sin fecha',color:'slate',meses:null};
+  var meses=(hoy.getFullYear()-n.getFullYear())*12+(hoy.getMonth()-n.getMonth());
+  if(hoy.getDate()<n.getDate()) meses--;
+  if(meses<0) meses=0;
+  var anios=Math.floor(meses/12), resto=meses%12, texto;
+  if(meses<1) texto='menos de un mes';
+  else if(anios<1) texto=meses+(meses===1?' mes':' meses');
+  else texto=anios+(anios===1?' año':' años')+(resto?' '+resto+(resto===1?' mes':' meses'):'');
+  var r,c;
+  if(meses<3){r='0-3 meses';c='sky';}
+  else if(meses<6){r='3-6 meses';c='teal';}
+  else if(meses<12){r='6 meses - 1 año';c='indigo';}
+  else if(meses<60){r='1-5 años';c='violet';}
+  else{r='Más de 5 años';c='emerald';}
+  return {texto:texto,rango:r,color:c,meses:meses};
+}
 function hoy(){ var d=new Date(); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
 function nomShow(m){ if(!m) return ''; var d=m.nombre_display; return (d&&(''+d).trim())?(''+d).trim():(m.nombre||''); }
 
@@ -695,6 +714,7 @@ function formMiembro(m){
          Object.keys(SITUACIONES).map(function(k){ return '<option value="'+k+'"'+((m.situacion||'activo')===k?' selected':'')+'>'+SITUACIONES[k][0]+'</option>'; }).join('')+'</select></div>'+
        '<div><label class="text-sm font-medium text-slate-700">Fecha de bautismo</label><input name="fecha_bautismo" type="date" value="'+esc(m.fecha_bautismo||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg bg-white"></div>'+
      '</div>'+
+     '<div><label class="text-sm font-medium text-slate-700">Fecha de ingreso a la iglesia</label><input name="fecha_ingreso" type="date" value="'+esc(m.fecha_ingreso||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg bg-white"><p class="text-xs text-slate-500 mt-1">Cuándo empezó a congregarse. Sirve para medir su antigüedad.</p></div>'+
      '<label class="flex items-center gap-2 text-sm"><input type="checkbox" name="es_lider" '+(m.es_lider?'checked':'')+' class="w-4 h-4 accent-amber-600">Sirve como líder</label>'+
    '</div>'+
    '<div><label class="text-sm font-medium text-slate-700 flex items-center gap-1.5"><i data-lucide="target" class="w-4 h-4"></i>Ministerios <span class="text-xs text-slate-400 font-normal">(varios)</span></label>'+
@@ -721,6 +741,7 @@ function formMiembro(m){
         familia_id:fd.get('familia_id')||null,
         etapa:fd.get('etapa')||'nuevo', situacion:fd.get('situacion')||'activo', es_lider:!!fd.get('es_lider'),
         genero:fd.get('genero')||null, fecha_bautismo:fd.get('fecha_bautismo')||null,
+        fecha_ingreso:fd.get('fecha_ingreso')||null,
         fecha_nacimiento:fd.get('fecha_nacimiento')||null, notas:fd.get('notas')||null,
         lat:parseFloat(fd.get('lat'))||null, lng:parseFloat(fd.get('lng'))||null };
 
@@ -779,6 +800,7 @@ async function perfilMiembro(id){
       '<div class="space-y-2 text-sm bg-slate-50 rounded-xl p-3">'+
       (d.direccion?'<div><b>Dirección:</b> '+esc(d.direccion)+'</div>':'')+
       (d.families?'<div><b>Familia:</b> '+esc(d.families.nombre_familia)+'</div>':'')+(d.fecha_nacimiento?'<div><b>Nacimiento:</b> '+fecha(d.fecha_nacimiento)+(er.edad!=null?' · '+er.edad+' años ('+er.rango+')':'')+'</div>':'')+(d.sector?'<div><b>Sector:</b> '+esc(d.sector)+'</div>':'')+
+      (d.fecha_ingreso?(function(){var a=antiguedad(d.fecha_ingreso);return '<div><b>En la iglesia desde:</b> '+fecha(d.fecha_ingreso)+(a.texto?' · <span class="text-'+a.color+'-700 font-medium">'+a.texto+'</span> ('+a.rango+')':'')+'</div>';})():'')+
       (mins.length?'<div><b>Ministerios:</b> '+esc(mins.join(', '))+'</div>':'')+
       (cas.length?'<div><b>Casas de Pan:</b> '+esc(cas.join(', '))+'</div>':'')+
       (d.notas?'<div><b>Notas:</b> '+esc(d.notas)+'</div>':'')+'</div>'+
@@ -1960,7 +1982,7 @@ var SVGNS='http://www.w3.org/2000/svg';
 
 /* Paleta coherente con la app */
 var GC={ indigo:'#6366f1', violet:'#8b5cf6', emerald:'#10b981', amber:'#f59e0b',
-  rose:'#f43f5e', sky:'#0ea5e9', slate:'#94a3b8', red:'#ef4444' };
+  rose:'#f43f5e', sky:'#0ea5e9', slate:'#94a3b8', red:'#ef4444', teal:'#14b8a6' };
 
 function statLoading(){ return '<div class="text-center py-16 text-slate-400"><i data-lucide="loader-circle" class="w-8 h-8 mx-auto animate-spin"></i><p class="text-sm mt-2">Calculando estadísticas...</p></div>'; }
 
@@ -2672,9 +2694,10 @@ async function view_stats(){
       dbGet('v_stats_decisiones_mes','select=*&order=periodo'),
       Promise.resolve([]),
       dbGet('v_stats_en_riesgo','select=*&limit=60'),
-      finAuditor()?dbGet('v_cajas_saldos','select=id,nombre&order=orden.asc,nombre.asc'):Promise.resolve([])
+      finAuditor()?dbGet('v_cajas_saldos','select=id,nombre&order=orden.asc,nombre.asc'):Promise.resolve([]),
+      rpcJson('stats_antiguedad',{}).catch(function(){return [];})
     ]);
-    render_stats(d[0][0]||{}, d[1], d[2], d[3], d[4][0]||{}, d[5], d[6], d[7], d[8], d[9], d[10], d[11], d[12]);
+    render_stats(d[0][0]||{}, d[1], d[2], d[3], d[4][0]||{}, d[5], d[6], d[7], d[8], d[9], d[10], d[11], d[12], d[13]);
   }catch(e){ errorPagina(e); }
 }
 
@@ -2694,7 +2717,7 @@ function filtrarFinanzasCaja(cajaId){
   el.innerHTML='<div class="text-center py-6 text-slate-400"><i data-lucide="loader-circle" class="w-6 h-6 mx-auto animate-spin"></i></div>'; ri();
   rpcJson('stats_finanzas_mes',{p_caja:cajaId||null}).then(function(d){ el.innerHTML=finBox(d); ri(); }).catch(function(){ el.innerHTML='<p class="text-sm text-red-500 py-4 text-center">No se pudo filtrar.</p>'; });
 }
-function render_stats(mem, etapas, crec, asis, vis, casas, finMes, finCat, dec, decMes, ingPast, riesgo, finCajas){
+function render_stats(mem, etapas, crec, asis, vis, casas, finMes, finCat, dec, decMes, ingPast, riesgo, finCajas, antig){
   var p=document.getElementById('page');
   var h='';
 
@@ -2733,6 +2756,24 @@ function render_stats(mem, etapas, crec, asis, vis, casas, finMes, finCat, dec, 
     h+=card('Camino espiritual','route','<div class="pt-1">'+barras+'</div><p class="text-xs text-slate-400 text-center mt-3">De la visita a la plena comunión</p>');
   } else {
     h+=card('Camino espiritual','route',chartEmpty('route','Muestra cuántos miembros hay en cada etapa: visita, nuevo, discipulado, bautizado y miembro pleno.'));
+  }
+  h+='</div>';
+
+  /* --- Antigüedad en la iglesia --- */
+  var ANTCOL={'0-3 meses':GC.sky,'3-6 meses':GC.teal||'#14b8a6','6 meses - 1 año':GC.indigo,'1-5 años':GC.violet,'Más de 5 años':GC.emerald,'Sin fecha':GC.slate};
+  var ant=(antig||[]).slice().sort(function(a,b){return (a.orden||0)-(b.orden||0);});
+  var totAnt=ant.reduce(function(a,b){return a+Number(b.n||0);},0);
+  h+='<div class="grid lg:grid-cols-2 gap-4 mb-4">';
+  if(totAnt>0){
+    var maxA=Math.max.apply(null, ant.map(function(x){return Number(x.n);}).concat([1]));
+    var barrasA=ant.map(function(e){
+      var col=ANTCOL[e.rango]||GC.slate, w=Math.round(Number(e.n)/maxA*100), pct=totAnt?Math.round(Number(e.n)/totAnt*100):0;
+      return '<div class="mb-2.5"><div class="flex items-center justify-between text-xs mb-1"><span class="font-medium text-slate-700">'+esc(e.rango)+'</span><span class="text-slate-500 font-semibold">'+e.n+' <span class="text-slate-400 font-normal">('+pct+'%)</span></span></div>'+
+        '<div class="h-2.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-full rounded-full transition-all" style="width:'+w+'%;background:'+col+'"></div></div></div>';
+    }).join('');
+    h+=card('Antigüedad en la iglesia','history','<div class="pt-1">'+barrasA+'</div><p class="text-xs text-slate-400 text-center mt-3">Tiempo que cada miembro lleva congregándose</p>');
+  } else {
+    h+=card('Antigüedad en la iglesia','history',chartEmpty('history','Registra la fecha de ingreso de cada miembro para ver cuántos llevan poco tiempo y cuántos son veteranos.'));
   }
   h+='</div>';
 
@@ -2877,8 +2918,8 @@ function uid4(){ try{ return crypto.randomUUID(); }catch(e){ return 'xxxxxxxx-xx
 
 function finAdmin(){ return puede(['admin','pastor','tesorero']); }
 function finAuditor(){ return puede(['admin','pastor','tesorero','fiscal']); }
-function esResp(c){ return !!(c && c.responsable_id && S.user && c.responsable_id===S.user.id); }
-function puedeMover(c){ return finAdmin() || esResp(c); }
+function esResp(c){ if(!c||!S.user) return false; if(c.soy_responsable) return true; return !!(c.responsable_id && c.responsable_id===S.user.id); }
+function puedeMover(c){ if(finAdmin()) return true; if(!c) return false; if(typeof c.puedo_escribir!=='undefined') return !!c.puedo_escribir; return esResp(c); }
 function cajaPorId(id){ return TZ.cajas.filter(function(c){ return c.id===id; })[0]||null; }
 function icoCaja(c){ return c.tipo==='banco' ? 'landmark' : 'banknote'; }
 
@@ -2994,7 +3035,7 @@ function tzCard(c){
     '</div>'+
     '<div class="text-2xl font-bold '+(s<0?'text-red-600':'text-slate-800')+' mb-2">'+dinero(s)+'</div>'+
     '<div class="text-xs text-slate-500 space-y-1">'+
-      '<div class="flex items-center gap-1.5 truncate"><i data-lucide="user-check" class="w-3.5 h-3.5 flex-shrink-0"></i>'+(c.responsable_nombre?esc(c.responsable_nombre):'<span class="text-amber-600">Sin responsable asignado</span>')+'</div>'+
+      '<div class="flex items-center gap-1.5 truncate"><i data-lucide="user-check" class="w-3.5 h-3.5 flex-shrink-0"></i>'+(c.responsables_nombres?esc(c.responsables_nombres):(c.responsable_nombre?esc(c.responsable_nombre):'<span class="text-amber-600">Sin responsable asignado</span>'))+'</div>'+
       (banco&&c.banco?'<div class="flex items-center gap-1.5 truncate"><i data-lucide="credit-card" class="w-3.5 h-3.5 flex-shrink-0"></i>'+esc(c.banco)+(c.numero_cuenta?' · '+esc(c.numero_cuenta):'')+'</div>':'')+
       '<div class="flex items-center gap-1.5"><i data-lucide="receipt" class="w-3.5 h-3.5"></i>'+(c.n_movimientos||0)+' movimiento'+(Number(c.n_movimientos)===1?'':'s')+(c.ultimo_movimiento?' · último '+fecha(c.ultimo_movimiento):'')+'</div>'+
     '</div></div>';
@@ -3013,7 +3054,7 @@ async function tzVerCaja(id){
     '<div class="bg-white rounded-2xl border border-slate-200 p-5 mb-4">'+
       '<div class="flex items-start gap-3 mb-4"><div class="w-12 h-12 rounded-xl '+(banco?'bg-sky-100 text-sky-700':'bg-emerald-100 text-emerald-700')+' flex items-center justify-center flex-shrink-0"><i data-lucide="'+icoCaja(c)+'" class="w-6 h-6"></i></div>'+
       '<div class="min-w-0 flex-1"><h3 class="text-lg font-bold text-slate-800">'+esc(c.nombre)+'</h3>'+
-      '<p class="text-xs text-slate-500">'+esc(c.tipo)+' · Responsable: '+(c.responsable_nombre?esc(c.responsable_nombre):'sin asignar')+'</p></div></div>'+
+      '<p class="text-xs text-slate-500">'+esc(c.tipo)+' · Responsables: '+(c.responsables_nombres?esc(c.responsables_nombres):(c.responsable_nombre?esc(c.responsable_nombre):'sin asignar'))+'</p></div></div>'+
       '<div class="grid grid-cols-3 gap-3 text-center">'+
         '<div class="bg-slate-50 rounded-xl p-3"><div class="text-[11px] text-slate-500 mb-0.5">Saldo</div><div class="font-bold '+(s<0?'text-red-600':'text-slate-800')+'">'+dinero(s)+'</div></div>'+
         '<div class="bg-emerald-50 rounded-xl p-3"><div class="text-[11px] text-emerald-700 mb-0.5">Ingresos</div><div class="font-bold text-emerald-700">'+dinero(c.total_ingresos)+'</div></div>'+
@@ -3231,6 +3272,10 @@ async function formCaja(c){
   await tzPerfiles();
   var eqs=await cat('teams','select=id,nombre&order=nombre');
   var esCasa=c.ambito==='casa_de_pan';
+  // Responsables actuales (tabla puente)
+  var respActuales=[];
+  if(c.id){ try{ respActuales=await dbGet('caja_responsables','caja_id=eq.'+c.id+'&select=user_id,puede_escribir'); }catch(e){} }
+  var mapResp={}; respActuales.forEach(function(r){ mapResp[r.user_id]=r; });
   var ambitos=[['general','Iglesia (general)'],['ministerio','Ministerio'],['proyecto','Proyecto']];
   modal('mCj', mHead((c.id?'Editar':'Nueva')+' caja','mCj')+
    '<form id="fCj" class="p-4 space-y-3">'+
@@ -3246,9 +3291,19 @@ async function formCaja(c){
      '<div><label class="text-sm font-medium">Banco</label><input name="banco" value="'+esc(c.banco||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
      '<div><label class="text-sm font-medium">N° de cuenta</label><input name="numero_cuenta" value="'+esc(c.numero_cuenta||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
    '</div>'+
-   '<div><label class="text-sm font-medium">Responsable *</label><select name="responsable_id" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"><option value="">— Sin responsable —</option>'+
-     TZ.perfiles.map(function(p){ return '<option value="'+p.id+'"'+(c.responsable_id===p.id?' selected':'')+'>'+esc(p.nombre)+' ('+esc(p.rol)+')</option>'; }).join('')+'</select>'+
-     '<p class="text-xs text-slate-500 mt-1">Solo el responsable y la administración podrán registrar movimientos en esta caja.</p></div>'+
+   '<div><label class="text-sm font-medium">Responsables de esta caja</label>'+
+     '<div class="mt-1 border border-slate-300 rounded-lg divide-y divide-slate-100 max-h-56 overflow-y-auto">'+
+     (TZ.perfiles.length?TZ.perfiles.map(function(p){
+        var r=mapResp[p.id]; var asignado=!!r; var escribe=r?r.puede_escribir:true;
+        return '<div class="flex items-center gap-2 p-2.5">'+
+          '<label class="flex items-center gap-2 flex-1 min-w-0 cursor-pointer">'+
+            '<input type="checkbox" class="cjResp w-4 h-4 flex-shrink-0" data-uid="'+p.id+'" '+(asignado?'checked':'')+' onchange="var w=this.closest(\'div\').querySelector(\'.cjEsc\');if(w){w.disabled=!this.checked;if(!this.checked)w.checked=false;}">'+
+            '<span class="text-sm text-slate-700 truncate">'+esc(p.nombre)+' <span class="text-slate-400">('+esc(p.rol)+')</span></span>'+
+          '</label>'+
+          '<label class="flex items-center gap-1 text-[11px] text-slate-500 flex-shrink-0"><input type="checkbox" class="cjEsc w-3.5 h-3.5" data-uid="'+p.id+'" '+(escribe?'checked':'')+' '+(asignado?'':'disabled')+'>escribe</label>'+
+        '</div>';
+      }).join(''):'<p class="text-xs text-slate-400 p-3">No hay usuarios con perfil disponibles.</p>')+'</div>'+
+     '<p class="text-xs text-slate-500 mt-1">Marca quién puede <b>ver</b> esta caja. La casilla "escribe" permite además registrar y editar movimientos. La administración (admin/pastor/tesorero) siempre tiene acceso total.</p></div>'+
    '<div><label class="text-sm font-medium">Ministerio (opcional)</label><select name="team_id" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"><option value="">—</option>'+
      eqs.map(function(t){ return '<option value="'+t.id+'"'+(c.team_id===t.id?' selected':'')+'>'+esc(t.nombre)+'</option>'; }).join('')+'</select></div>'+
    '<div class="grid grid-cols-2 gap-3">'+
@@ -3264,15 +3319,30 @@ async function formCaja(c){
     try{
       var fd=new FormData(e.target);
       var tipo=fd.get('tipo');
-      var b={ nombre:fd.get('nombre'), tipo:tipo, responsable_id:fd.get('responsable_id')||null,
+      // Responsables seleccionados
+      var resps=[];
+      document.querySelectorAll('#fCj .cjResp:checked').forEach(function(chk){
+        var uid=chk.getAttribute('data-uid');
+        var escBox=document.querySelector('#fCj .cjEsc[data-uid="'+uid+'"]');
+        resps.push({ user_id:uid, puede_escribir:!!(escBox&&escBox.checked) });
+      });
+      var b={ nombre:fd.get('nombre'), tipo:tipo, responsable_id:(resps[0]?resps[0].user_id:null),
               team_id:fd.get('team_id')||null, banco:tipo==='banco'?(fd.get('banco')||null):null,
               numero_cuenta:tipo==='banco'?(fd.get('numero_cuenta')||null):null,
               saldo_inicial:parseFloat(fd.get('saldo_inicial'))||0, orden:parseInt(fd.get('orden'),10)||100,
               descripcion:fd.get('descripcion')||null, activa:!!fd.get('activa'),
               icono:tipo==='banco'?'landmark':'banknote', color:tipo==='banco'?'sky':'emerald' };
       if(!esCasa && fd.get('ambito')) b.ambito=fd.get('ambito');
+      var cajaId=c.id;
       if(c.id) await dbPatch('cajas','id=eq.'+c.id,b);
-      else { b.creado_por=S.user.id; await dbPost('cajas',b); }
+      else { b.creado_por=S.user.id; var nueva=await dbPost('cajas',b); cajaId=(nueva&&nueva[0])?nueva[0].id:null; }
+      // Sincronizar tabla puente: borrar y reinsertar
+      if(cajaId){
+        try{ await dbDel('caja_responsables','caja_id=eq.'+cajaId); }catch(e){}
+        if(resps.length){
+          await dbPost('caja_responsables', resps.map(function(r){ return { caja_id:cajaId, user_id:r.user_id, puede_escribir:r.puede_escribir }; }));
+        }
+      }
       toast('Caja guardada','success'); closeModal('mCj'); TZ.caja=null; await tzIrTab('cajas');
     }catch(err){ toast(err.message.slice(0,140),'error'); }
   };
@@ -3338,7 +3408,10 @@ async function borrarCategoria(id){
 /* =====================================================================
    FINANZAS EXPERTAS · presupuesto, informe, recibos, arqueo, cierre
    ===================================================================== */
-var FZ={ anio:(new Date()).getFullYear(), mes:(new Date()).getMonth()+1 };
+var FZ={ anio:(new Date()).getFullYear(), mes:(new Date()).getMonth()+1, modo:'mes', desde:null, hasta:null, caja:'' };
+function fzPrimerDiaMes(a,m){ return a+'-'+ri2(m)+'-01'; }
+function fzUltimoDiaMes(a,m){ var d=new Date(a,m,0); return a+'-'+ri2(m)+'-'+ri2(d.getDate()); }
+function ri2(n){ n=parseInt(n,10); return (n<10?'0':'')+n; }
 var MES_L=['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
 /* ---------- PRESUPUESTO vs EJECUTADO ---------- */
@@ -3426,28 +3499,55 @@ async function borrarPresupuesto(id){
 }
 
 /* ---------- INFORME MENSUAL ---------- */
+function fzRango(){
+  if(FZ.modo==='rango' && FZ.desde && FZ.hasta) return [FZ.desde, FZ.hasta];
+  return [fzPrimerDiaMes(FZ.anio,FZ.mes), fzUltimoDiaMes(FZ.anio,FZ.mes)];
+}
+async function fzCajasVisibles(){
+  // Solo las cajas que el usuario puede ver (RLS filtra automáticamente)
+  try{ return await dbGet('v_cajas_saldos','select=id,nombre&order=orden.asc,nombre.asc'); }catch(e){ return []; }
+}
 async function pintarInforme(){
   var b=document.getElementById('tzBody'); b.innerHTML=spin(); ri();
   try{
-    var r=await datosInforme(FZ.anio,FZ.mes);
-    var h='<div class="flex flex-wrap items-center gap-2 mb-4">'+
-      '<select onchange="FZ.mes=parseInt(this.value);pintarInforme()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium">'+
-      MES_L.slice(1).map(function(m,i){ return '<option value="'+(i+1)+'"'+(FZ.mes===i+1?' selected':'')+'>'+m+'</option>'; }).join('')+'</select>'+
-      '<select onchange="FZ.anio=parseInt(this.value);pintarInforme()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium">'+
-      anios().map(function(a){ return '<option value="'+a+'"'+(a===FZ.anio?' selected':'')+'>'+a+'</option>'; }).join('')+'</select>'+
-      '<button onclick="descargarInforme()" class="ml-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-sm flex items-center gap-1.5"><i data-lucide="download" class="w-4 h-4"></i>PDF</button></div>';
+    var cajas=await fzCajasVisibles();
+    var r=await datosInforme();
+    var selMes='<select onchange="FZ.modo=\'mes\';FZ.mes=parseInt(this.value);pintarInforme()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium">'+
+      MES_L.slice(1).map(function(m,i){ return '<option value="'+(i+1)+'"'+(FZ.modo==='mes'&&FZ.mes===i+1?' selected':'')+'>'+m+'</option>'; }).join('')+'</select>'+
+      '<select onchange="FZ.modo=\'mes\';FZ.anio=parseInt(this.value);pintarInforme()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium">'+
+      anios().map(function(a){ return '<option value="'+a+'"'+(FZ.anio===a?' selected':'')+'>'+a+'</option>'; }).join('')+'</select>';
+    var rango=fzRango();
+    var selRango='<input type="date" value="'+rango[0]+'" onchange="FZ.modo=\'rango\';FZ.desde=this.value;pintarInforme()" class="px-2 py-2 border border-slate-300 rounded-lg text-sm">'+
+      '<span class="text-slate-400 text-sm">a</span>'+
+      '<input type="date" value="'+rango[1]+'" onchange="FZ.modo=\'rango\';FZ.hasta=this.value;pintarInforme()" class="px-2 py-2 border border-slate-300 rounded-lg text-sm">';
+    var selCaja='<select onchange="FZ.caja=this.value;pintarInforme()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium bg-white"><option value="">Todas las cajas visibles</option>'+
+      cajas.map(function(c){ return '<option value="'+c.id+'"'+(FZ.caja===c.id?' selected':'')+'>'+esc(c.nombre)+'</option>'; }).join('')+'</select>';
+    var toggle='<div class="inline-flex rounded-lg border border-slate-300 overflow-hidden text-sm">'+
+      '<button onclick="FZ.modo=\'mes\';pintarInforme()" class="px-3 py-2 '+(FZ.modo==='mes'?'bg-indigo-600 text-white':'bg-white text-slate-600')+'">Por mes</button>'+
+      '<button onclick="FZ.modo=\'rango\';if(!FZ.desde){var g=fzRango();FZ.desde=g[0];FZ.hasta=g[1];}pintarInforme()" class="px-3 py-2 '+(FZ.modo==='rango'?'bg-indigo-600 text-white':'bg-white text-slate-600')+'">Por fechas</button></div>';
+    var h='<div class="flex flex-wrap items-center gap-2 mb-3">'+toggle+
+      (FZ.modo==='mes'?selMes:selRango)+
+      '<button onclick="descargarInforme()" class="ml-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-sm flex items-center gap-1.5"><i data-lucide="download" class="w-4 h-4"></i>PDF</button></div>'+
+      '<div class="mb-4">'+selCaja+'</div>';
     h+='<div id="informeDoc">'+htmlInforme(r)+'</div>';
     b.innerHTML=h; ri();
   }catch(e){ b.innerHTML='<div class="text-sm text-red-600 p-3">'+esc(e.message.slice(0,150))+'</div>'; }
 }
-async function datosInforme(anio,mes){
-  var cats=await dbGet('rpc/informe_categorias','',null).catch(function(){return null;});
-  // rpc por POST:
-  var r=await req('/rest/v1/rpc/informe_categorias',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({p_anio:anio,p_mes:mes}) });
+async function datosInforme(){
+  var rango=fzRango(), desde=rango[0], hasta=rango[1], caja=FZ.caja||null;
+  var r=await req('/rest/v1/rpc/informe_rango',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({p_desde:desde,p_hasta:hasta,p_caja:caja}) });
   var categorias=r.ok?await r.json():[];
-  var porCaja=await dbGet('v_informe_mensual','anio=eq.'+anio+'&mes=eq.'+mes+'&select=*');
-  var cerrado=await dbGet('cierres_mes','anio=eq.'+anio+'&mes=eq.'+mes+'&select=*');
-  return { anio:anio, mes:mes, categorias:categorias, porCaja:porCaja, cierre:cerrado[0]||null };
+  var rc=await req('/rest/v1/rpc/informe_rango_cajas',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({p_desde:desde,p_hasta:hasta,p_caja:caja}) });
+  var porCaja=rc.ok?(await rc.json()).map(function(c){ return {caja:c.caja, ingresos:c.ingresos, egresos:c.egresos, neto:c.neto}; }):[];
+  // Cierre solo aplica cuando el modo es un mes calendario completo sin filtrar por caja
+  var cierre=null;
+  if(FZ.modo==='mes' && !caja){
+    var cerrado=await dbGet('cierres_mes','anio=eq.'+FZ.anio+'&mes=eq.'+FZ.mes+'&select=*').catch(function(){return [];});
+    cierre=cerrado[0]||null;
+  }
+  var cajaNom='';
+  if(caja){ var cs=await fzCajasVisibles(); var f=cs.filter(function(x){return x.id===caja;})[0]; cajaNom=f?f.nombre:''; }
+  return { desde:desde, hasta:hasta, categorias:categorias, porCaja:porCaja, cierre:cierre, caja:caja, cajaNom:cajaNom };
 }
 function htmlInforme(r){
   var ing=r.categorias.filter(function(c){return c.tipo==='ingreso';});
@@ -3466,7 +3566,8 @@ function htmlInforme(r){
     '<div class="text-center border-b border-slate-200 pb-4 mb-4">'+
     '<div class="w-12 h-12 rounded-xl bg-indigo-600 text-white flex items-center justify-center mx-auto mb-2 font-bold text-xl">A</div>'+
     '<h3 class="text-lg font-bold text-slate-800">Iglesia ADULAM</h3>'+
-    '<p class="text-sm text-slate-500">Informe financiero · '+MES_L[r.mes]+' '+r.anio+'</p>'+
+    '<p class="text-sm text-slate-500">Informe financiero · '+fecha(r.desde)+' a '+fecha(r.hasta)+'</p>'+
+    (r.cajaNom?'<p class="text-xs text-indigo-600 font-medium mt-0.5">Caja: '+esc(r.cajaNom)+'</p>':'')+
     (r.cierre?'<span class="inline-flex items-center gap-1 mt-1 text-[11px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold"><i data-lucide="lock" class="w-3 h-3"></i>Mes cerrado</span>':'<span class="inline-flex items-center gap-1 mt-1 text-[11px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-semibold">Provisional</span>')+
     '</div>'+
     '<div class="grid grid-cols-3 gap-3 mb-5 text-center">'+
@@ -3487,7 +3588,8 @@ function htmlInforme(r){
     '</div>';
 }
 async function descargarInforme(){
-  var r=await datosInforme(FZ.anio,FZ.mes);
+  var r=await datosInforme();
+  var titRango=fecha(r.desde)+' a '+fecha(r.hasta)+(r.cajaNom?' · '+r.cajaNom:'');
   var ing=r.categorias.filter(function(c){return c.tipo==='ingreso';});
   var egr=r.categorias.filter(function(c){return c.tipo==='egreso';});
   var totIng=ing.reduce(function(a,c){return a+Number(c.total);},0);
@@ -3495,7 +3597,7 @@ async function descargarInforme(){
   var fila=function(c){ return '<tr><td>'+esc(c.categoria)+'</td><td class="n">'+dinero(c.total)+'</td></tr>'; };
   var win=window.open('','_blank');
   if(!win){ toast('Permite las ventanas emergentes para descargar','warning'); return; }
-  win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Informe '+MES_L[r.mes]+' '+r.anio+'</title>'+
+  win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Informe '+titRango+'</title>'+
     '<style>*{font-family:Georgia,serif;color:#1e293b}body{max-width:720px;margin:0 auto;padding:40px}'+
     'h1{text-align:center;font-size:22px;margin:0}h2{text-align:center;font-weight:normal;color:#64748b;font-size:14px;margin:4px 0 24px}'+
     '.logo{width:56px;height:56px;background:#4f46e5;color:#fff;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:bold;margin:0 auto 10px;font-family:Arial}'+
@@ -3506,7 +3608,7 @@ async function descargarInforme(){
     '.foot{text-align:center;color:#94a3b8;font-size:11px;margin-top:40px;border-top:1px solid #e2e8f0;padding-top:16px}'+
     '.firma{display:flex;gap:40px;margin-top:50px}.firma div{flex:1;text-align:center;border-top:1px solid #334155;padding-top:6px;font-size:12px}'+
     '@media print{body{padding:20px}}</style></head><body>'+
-    '<div class="logo">A</div><h1>Iglesia ADULAM</h1><h2>Informe financiero · '+MES_L[r.mes]+' '+r.anio+(r.cierre?' (cerrado)':' (provisional)')+'</h2>'+
+    '<div class="logo">A</div><h1>Iglesia ADULAM</h1><h2>Informe financiero · '+titRango+(r.cierre?' (cerrado)':' (provisional)')+'</h2>'+
     '<div class="tot"><div class="box ing"><div class="l">Ingresos</div><div class="v">'+dinero(totIng)+'</div></div>'+
     '<div class="box egr"><div class="l">Egresos</div><div class="v">'+dinero(totEgr)+'</div></div>'+
     '<div class="box res"><div class="l">Resultado</div><div class="v">'+dinero(totIng-totEgr)+'</div></div></div>'+
@@ -4170,7 +4272,7 @@ function mostrar(vista){
 function mostrarLogin(){ mostrar('loginView'); }
 
 async function entrarApp(){
-  try{ var mc = await dbGet('cajas','responsable_id=eq.'+S.user.id+'&select=id'); S.misCajas = mc.length; }catch(e){ S.misCajas = 0; }
+  try{ var mc = await dbGet('caja_responsables','user_id=eq.'+S.user.id+'&select=caja_id'); S.misCajas = mc.length; }catch(e){ S.misCajas = 0; }
   document.getElementById('userName').textContent = S.profile.nombre||'Usuario';
   document.getElementById('userRole').textContent = S.profile.rol||'miembro';
   document.getElementById('avatarIni').textContent = (S.profile.nombre||'U')[0].toUpperCase();
