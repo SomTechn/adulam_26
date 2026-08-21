@@ -800,8 +800,10 @@ async function perfilMiembro(id){
     }).join('') : '<p class="text-slate-400 text-sm">Sin registros</p>';
     modalFull('mP', mHead('Perfil del miembro','mP')+'<div class="p-4 max-w-2xl mx-auto pb-8">'+
       '<div class="flex items-center gap-4 mb-4"><div class="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-2xl font-bold overflow-hidden">'+
-      (d.foto_url?'<img src="'+esc(d.foto_url)+'" class="w-full h-full object-cover">':esc(d.nombre[0].toUpperCase()))+'</div>'+
-      '<div class="min-w-0"><h3 class="text-xl font-bold truncate">'+esc(d.nombre)+'</h3><p class="text-slate-500 text-sm capitalize">'+esc(d.estado_espiritual)+'</p>'+(er.edad!=null?'<span class="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-'+er.color+'-100 text-'+er.color+'-700">'+er.edad+' años · '+er.rango+'</span>':'')+
+      (d.foto_url?'<img src="'+esc(d.foto_url)+'" class="w-full h-full object-cover">':esc((nomShow(d)||'?')[0].toUpperCase()))+'</div>'+
+      '<div class="min-w-0"><h3 class="text-xl font-bold truncate">'+esc(nomShow(d))+'</h3>'+
+      ((d.nombre_display&&(''+d.nombre_display).trim()&&d.nombre_display!==d.nombre)?'<p class="text-slate-400 text-xs truncate">'+esc(d.nombre)+'</p>':'')+
+      '<p class="text-slate-500 text-sm capitalize">'+esc(d.estado_espiritual)+'</p>'+(er.edad!=null?'<span class="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-'+er.color+'-100 text-'+er.color+'-700">'+er.edad+' años · '+er.rango+'</span>':'')+
       (d.telefono?'<p class="text-sm mt-1">'+esc(d.telefono)+'</p>':'')+'</div></div>'+
       '<div class="space-y-2 text-sm bg-slate-50 rounded-xl p-3">'+
       (d.direccion?'<div><b>Dirección:</b> '+esc(d.direccion)+'</div>':'')+
@@ -836,7 +838,7 @@ async function pintarFamilias(){
       '<div class="flex gap-1">'+(puede(['pastor','lider','servidor'])?'<button onclick="formFamilia({id:\''+f.id+'\',nombre_familia:\''+esc(f.nombre_familia).replace(/'/g,"")+'\'})" class="p-1.5 hover:bg-slate-100 rounded-lg"><i data-lucide="pencil" class="w-4 h-4"></i></button>':'')+
       (puede(['pastor'])?'<button onclick="borrarFamilia(\''+f.id+'\',\''+esc(f.nombre_familia).replace(/'/g,"")+'\')" class="p-1.5 text-red-600 hover:bg-red-100 rounded-lg"><i data-lucide="trash-2" class="w-4 h-4"></i></button>':'')+'</div></div>'+
       '<p class="text-xs text-slate-500 mb-3">'+ints.length+' integrante'+(ints.length!==1?'s':'')+'</p>'+
-      '<div class="space-y-1">'+ints.slice(0,5).map(function(m){return '<div class="text-sm text-slate-700 flex items-center gap-1.5"><i data-lucide="user" class="w-3 h-3 text-slate-400"></i>'+esc(m.nombre)+'</div>';}).join('')+
+      '<div class="space-y-1">'+ints.slice(0,5).map(function(m){return '<div class="text-sm text-slate-700 flex items-center gap-1.5"><i data-lucide="user" class="w-3 h-3 text-slate-400"></i>'+esc(nomShow(m))+'</div>';}).join('')+
       (ints.length>5?'<div class="text-xs text-slate-400 pl-4">+'+(ints.length-5)+' más</div>':'')+'</div></div>';
   }).join('');
   ri();
@@ -873,8 +875,8 @@ async function view_houses(){
   ri(); await cat('members','select=id,nombre,nombre_display&order=nombre'); await pintarCasas();
 }
 async function pintarCasas(){
-  var hs=await dbGet('houses','select=*,members!houses_anfitrion_id_fkey(nombre)&order=nombre');
-  var rel=await dbGet('member_houses','select=house_id,members(nombre)');
+  var hs=await dbGet('houses','select=*,members!houses_anfitrion_id_fkey(nombre,nombre_display)&order=nombre');
+  var rel=await dbGet('member_houses','select=house_id,members(nombre,nombre_display)');
   limpiarCache('houses');
   var g=document.getElementById('hGrid');
   if(!hs.length){ g.innerHTML=vacio('wheat','Sin Casas de Pan registradas.'); ri(); return; }
@@ -883,14 +885,14 @@ async function pintarCasas(){
     return '<div class="bg-white rounded-2xl border border-slate-200 p-5"><div class="flex items-start justify-between mb-3">'+
       '<div class="flex items-center gap-2 flex-1 min-w-0"><div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0"><i data-lucide="wheat" class="w-5 h-5"></i></div>'+
       '<div class="min-w-0"><h4 class="font-bold text-slate-800 truncate">'+esc(h.nombre)+'</h4>'+
-      (h.members?'<p class="text-xs text-slate-500 truncate">Anfitrión: '+esc(h.members.nombre)+'</p>':'<p class="text-xs text-slate-400">Sin anfitrión</p>')+'</div></div>'+
+      (h.members?'<p class="text-xs text-slate-500 truncate">Anfitrión: '+esc(nomShow(h.members))+'</p>':'<p class="text-xs text-slate-400">Sin anfitrión</p>')+'</div></div>'+
       '<div class="flex gap-1 flex-shrink-0">'+(puede(['pastor','lider','servidor'])?'<button onclick="editarCasa(\''+h.id+'\')" class="p-1.5 hover:bg-slate-100 rounded-lg"><i data-lucide="pencil" class="w-4 h-4"></i></button>':'')+
       (puede(['pastor'])?'<button onclick="borrarCasa(\''+h.id+'\',\''+esc(h.nombre).replace(/'/g,"")+'\')" class="p-1.5 text-red-600 hover:bg-red-100 rounded-lg"><i data-lucide="trash-2" class="w-4 h-4"></i></button>':'')+'</div></div>'+
       '<div class="text-sm text-slate-600 space-y-1 mb-3">'+
       (h.dia_reunion?'<div class="flex items-center gap-1.5"><i data-lucide="calendar" class="w-3.5 h-3.5 text-slate-400"></i><span class="capitalize">'+esc(h.dia_reunion)+'</span>'+(h.hora?' · '+esc(h.hora):'')+'</div>':'')+
       (h.direccion?'<div class="flex items-center gap-1.5"><i data-lucide="map-pin" class="w-3.5 h-3.5 text-slate-400"></i>'+esc(h.direccion)+'</div>':'')+'</div>'+
       '<div class="border-t border-slate-100 pt-3"><div class="text-xs font-semibold text-slate-500 mb-2 flex items-center gap-1.5"><i data-lucide="users" class="w-3.5 h-3.5"></i>'+ints.length+' integrante'+(ints.length!==1?'s':'')+'</div>'+
-      '<div class="flex flex-wrap gap-1">'+ints.slice(0,8).map(function(r){return '<span class="text-xs bg-amber-50 text-amber-800 px-2 py-0.5 rounded-md">'+esc(r.members?r.members.nombre:'?')+'</span>';}).join('')+
+      '<div class="flex flex-wrap gap-1">'+ints.slice(0,8).map(function(r){return '<span class="text-xs bg-amber-50 text-amber-800 px-2 py-0.5 rounded-md">'+esc(r.members?nomShow(r.members):'?')+'</span>';}).join('')+
       (ints.length>8?'<span class="text-xs text-slate-400">+'+(ints.length-8)+'</span>':'')+'</div></div></div>';
   }).join('');
   ri();
@@ -904,7 +906,7 @@ function formCasa(h){
    '<form id="fH" class="p-4 space-y-3">'+
    '<div><label class="text-sm font-medium">Nombre *</label><input name="nombre" required value="'+esc(h.nombre||'')+'" placeholder="Ej: Casa López Norte" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
    '<div><label class="text-sm font-medium">Anfitrión</label><select name="anfitrion_id" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"><option value="">Sin anfitrión</option>'+
-     mem.map(function(m){return '<option value="'+m.id+'"'+(h.anfitrion_id===m.id?' selected':'')+'>'+esc(m.nombre)+'</option>';}).join('')+'</select></div>'+
+     mem.map(function(m){return '<option value="'+m.id+'"'+(h.anfitrion_id===m.id?' selected':'')+'>'+esc(nomShow(m))+'</option>';}).join('')+'</select></div>'+
    '<div><label class="text-sm font-medium">Dirección</label><input name="direccion" value="'+esc(h.direccion||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
    '<div class="bg-slate-50 rounded-xl p-3">'+
      '<div class="flex items-center justify-between mb-1.5"><label class="text-sm font-medium text-slate-700 flex items-center gap-1.5"><i data-lucide="map-pin" class="w-4 h-4"></i>Ubicación <span class="text-xs text-slate-400 font-normal">(para el mapa)</span></label>'+
@@ -942,7 +944,7 @@ async function view_teams(){
   ri(); await cat('members','select=id,nombre,nombre_display&order=nombre'); await pintarEquipos();
 }
 async function pintarEquipos(){
-  var ts=await dbGet('teams','select=*,members!teams_lider_fk(nombre)&order=nombre');
+  var ts=await dbGet('teams','select=*,members!teams_lider_fk(nombre,nombre_display)&order=nombre');
   var rel=await dbGet('member_teams','select=team_id');
   limpiarCache('teams');
   var cnt={}; rel.forEach(function(r){ cnt[r.team_id]=(cnt[r.team_id]||0)+1; });
@@ -956,7 +958,7 @@ async function pintarEquipos(){
       (puede(['pastor'])?'<button onclick="borrarEquipo(\''+t.id+'\',\''+esc(t.nombre).replace(/'/g,"")+'\')" class="p-1.5 text-red-600 hover:bg-red-100 rounded-lg"><i data-lucide="trash-2" class="w-4 h-4"></i></button>':'')+'</div></div>'+
       (t.descripcion?'<p class="text-sm text-slate-500 mb-3 lc2">'+esc(t.descripcion)+'</p>':'')+
       '<div class="text-sm space-y-1.5 border-t border-slate-100 pt-3">'+
-      '<div class="flex items-center gap-2"><i data-lucide="user-check" class="w-3.5 h-3.5 text-slate-400"></i><span class="text-slate-600">Líder:</span> <span class="font-medium">'+(t.members?esc(t.members.nombre):'<span class="text-slate-400">sin asignar</span>')+'</span></div>'+
+      '<div class="flex items-center gap-2"><i data-lucide="user-check" class="w-3.5 h-3.5 text-slate-400"></i><span class="text-slate-600">Líder:</span> <span class="font-medium">'+(t.members?esc(nomShow(t.members)):'<span class="text-slate-400">sin asignar</span>')+'</span></div>'+
       '<div class="flex items-center gap-2"><i data-lucide="users" class="w-3.5 h-3.5 text-slate-400"></i><span class="text-slate-600">Integrantes:</span> <span class="font-medium">'+(cnt[t.id]||0)+'</span></div>'+
       '</div></div>';
   }).join('');
@@ -970,7 +972,7 @@ function formEquipo(t){
    '<div><label class="text-sm font-medium">Nombre *</label><input name="nombre" required value="'+esc(t.nombre||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
    '<div><label class="text-sm font-medium">Descripción</label><textarea name="descripcion" rows="2" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg">'+esc(t.descripcion||'')+'</textarea></div>'+
    '<div><label class="text-sm font-medium">Líder</label><select name="lider_id" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"><option value="">Sin líder</option>'+
-     mem.map(function(m){return '<option value="'+m.id+'"'+(t.lider_id===m.id?' selected':'')+'>'+esc(m.nombre)+'</option>';}).join('')+'</select></div>'+
+     mem.map(function(m){return '<option value="'+m.id+'"'+(t.lider_id===m.id?' selected':'')+'>'+esc(nomShow(m))+'</option>';}).join('')+'</select></div>'+
    mFoot('mT')+'</form>');
   document.getElementById('fT').onsubmit=async function(e){
     e.preventDefault();
@@ -1281,7 +1283,7 @@ async function verPlan(id){
   p.innerHTML='<div class="text-center py-10 text-slate-400"><i data-lucide="loader-circle" class="w-7 h-7 mx-auto animate-spin"></i></div>'; ri();
   var pl=(await dbGet('v_plan_servicio','id=eq.'+id+'&select=*'))[0];
   if(!pl){ toast('Plan no encontrado','warning'); return volverSemana(); }
-  var tasks=await dbGet('service_tasks','service_plan_id=eq.'+id+'&select=*,members(nombre,foto_url)&order=created_at');
+  var tasks=await dbGet('service_tasks','service_plan_id=eq.'+id+'&select=*,members(nombre,nombre_display,foto_url)&order=created_at');
   var fecha=new Date(pl.fecha+'T12:00:00').toLocaleDateString('es-HN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   var editable=puede(['admin','pastor','lider','servidor']);
 
@@ -1334,7 +1336,7 @@ async function verPlan(id){
       return '<div class="flex items-center gap-3 p-2.5 rounded-xl '+(done?'bg-emerald-50':'bg-slate-50')+' group">'+
         (editable?'<button onclick="toggleTarea(\''+t.id+'\',\''+t.estado+'\')" class="np w-5 h-5 rounded-md border-2 '+(done?'bg-emerald-500 border-emerald-500 text-white':'border-slate-300 hover:border-indigo-400')+' flex items-center justify-center flex-shrink-0">'+(done?'<i data-lucide="check" class="w-3 h-3"></i>':'')+'</button>':'')+
         '<div class="flex-1 min-w-0"><div class="text-sm font-medium '+(done?'text-slate-400 line-through':'text-slate-800')+'">'+esc(t.nombre_tarea)+'</div>'+
-        (t.members?'<div class="text-xs text-slate-500">'+esc(t.members.nombre)+'</div>':'<div class="text-xs text-amber-500">Sin asignar</div>')+'</div>'+
+        (t.members?'<div class="text-xs text-slate-500">'+esc(nomShow(t.members))+'</div>':'<div class="text-xs text-amber-500">Sin asignar</div>')+'</div>'+
         (editable?'<button onclick="borrarTarea(\''+t.id+'\')" class="np p-1.5 opacity-0 group-hover:opacity-100 hover:bg-red-100 rounded text-red-500"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>':'')+'</div>';
     }).join('')+'</div>';
   } else {
@@ -1355,7 +1357,7 @@ function formTarea(planId){
    '<div><label class="text-sm font-medium">Tarea *</label><input name="nombre_tarea" required list="sug" placeholder="Ej: Sonido, proyección, ujieres..." class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg">'+
    '<datalist id="sug"><option>Abrir iglesia</option><option>Aseo del templo</option><option>Sonido</option><option>Proyección</option><option>Ujieres</option><option>Recibimiento</option><option>Café / refrigerio</option><option>Cierre del templo</option></datalist></div>'+
    '<div><label class="text-sm font-medium">Responsable</label><select name="responsable_id" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"><option value="">Sin responsable</option>'+
-     mem.map(function(m){return '<option value="'+m.id+'">'+esc(m.nombre)+'</option>';}).join('')+'</select></div>'+
+     mem.map(function(m){return '<option value="'+m.id+'">'+esc(nomShow(m))+'</option>';}).join('')+'</select></div>'+
    mFoot('mTa','Agregar')+'</form>');
   document.getElementById('fTa').onsubmit=async function(e){
     e.preventDefault();
@@ -1374,7 +1376,7 @@ async function borrarPlan(id){ if(!confirm('¿Eliminar el plan y sus tareas?'))r
 async function compartirPlan(id){
   try{
     var p=(await dbGet('v_plan_servicio','id=eq.'+id+'&select=*'))[0];
-    var ts=await dbGet('service_tasks','service_plan_id=eq.'+id+'&select=*,members(nombre)&order=created_at');
+    var ts=await dbGet('service_tasks','service_plan_id=eq.'+id+'&select=*,members(nombre,nombre_display)&order=created_at');
     var f=new Date(p.fecha+'T12:00:00').toLocaleDateString('es-HN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
     var roles=[]; 
     if(p.dirige) roles.push(['🎤 Dirige',p.dirige]);
@@ -1387,13 +1389,13 @@ async function compartirPlan(id){
 
     window._compartir = { fecha:f, hora:p.hora?horaTxt(p.hora):'', tipo:(p.reunion||p.tipo_reunion), tema:p.tema,
       roles:roles, anuncios:(p.anuncios||''), anunLineas:anunLineas,
-      tareas: ts.map(function(t){ return { n:t.nombre_tarea, r:(t.members?t.members.nombre:null) }; }) };
+      tareas: ts.map(function(t){ return { n:t.nombre_tarea, r:(t.members?nomShow(t.members):null) }; }) };
 
     var filas=roles.map(function(r){
       return '<div class="bg-white/10 rounded-lg px-3 py-2 flex items-center justify-between gap-2"><span class="text-sm">'+esc(r[0])+'</span><span class="text-sm font-semibold text-right">'+esc(r[1]||'—')+'</span></div>';
     }).join('');
     var filasT=ts.length?('<div class="border-t border-white/20 pt-2 mt-2 space-y-1">'+ts.map(function(t){
-      return '<div class="flex items-center justify-between text-xs text-white/90"><span>'+esc(t.nombre_tarea)+'</span><span>'+esc(t.members?t.members.nombre:'—')+'</span></div>';
+      return '<div class="flex items-center justify-between text-xs text-white/90"><span>'+esc(t.nombre_tarea)+'</span><span>'+esc(t.members?nomShow(t.members):'—')+'</span></div>';
     }).join('')+'</div>'):'';
     var anunBloque = anunLineas.length ? ('<div class="bg-white/15 rounded-xl p-3 mt-3"><div class="text-xs uppercase tracking-widest opacity-80 mb-1.5">📢 Anuncios'+(p.anuncios?' · '+esc(p.anuncios):'')+'</div><div class="space-y-1">'+anunLineas.map(function(l){ return '<div class="text-sm leading-snug flex items-start gap-1.5"><span class="opacity-70">•</span><span>'+esc(l)+'</span></div>'; }).join('')+'</div></div>') : '';
 
@@ -1611,7 +1613,7 @@ async function view_visitors(){
 async function pintarVisitas(){
   var L=document.getElementById('vsLista'); L.innerHTML='<div class="text-center py-8 text-slate-400"><i data-lucide="loader-circle" class="w-6 h-6 mx-auto animate-spin"></i></div>'; ri();
   try{
-    var q='select=*,members!visitors_invitado_por_fkey(nombre),asignado:members!visitors_asignado_a_fkey(nombre)&order=fecha_visita.desc&limit=200';
+    var q='select=*,members!visitors_invitado_por_fkey(nombre,nombre_display),asignado:members!visitors_asignado_a_fkey(nombre,nombre_display)&order=fecha_visita.desc&limit=200';
     if(VS.estado) q='estado=eq.'+VS.estado+'&'+q;
     var d=await dbGet('visitors',q);
     var fu=await dbGet('followups','select=visitor_id,fecha,proximo_contacto&order=fecha.desc');
@@ -1632,7 +1634,7 @@ async function pintarVisitas(){
         (pend?'<span class="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">Contactar</span>':'')+'</div>'+
         '<div class="text-xs text-slate-500 mt-1 space-y-0.5">'+
           '<div class="flex items-center gap-1.5"><i data-lucide="calendar" class="w-3.5 h-3.5"></i>Visitó el '+fecha(v.fecha_visita)+'</div>'+
-          (v.members?'<div class="flex items-center gap-1.5"><i data-lucide="user" class="w-3.5 h-3.5"></i>Invitado por '+esc(v.members.nombre)+'</div>':'')+
+          (v.members?'<div class="flex items-center gap-1.5"><i data-lucide="user" class="w-3.5 h-3.5"></i>Invitado por '+esc(nomShow(v.members))+'</div>':'')+
           '<div class="flex items-center gap-1.5"><i data-lucide="history" class="w-3.5 h-3.5"></i>'+mios.length+' contacto'+(mios.length===1?'':'s')+'</div>'+
         '</div></div>'+
         (v.telefono?'<a onclick="event.stopPropagation()" href="'+waLink(v.telefono,'¡Hola '+v.nombre.split(' ')[0]+'! Fue una alegría tenerte con nosotros. 🙏')+'" target="_blank" class="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg flex-shrink-0"><i data-lucide="message-circle" class="w-5 h-5"></i></a>':'')+
@@ -1661,11 +1663,11 @@ function formVisita(v){
    '</div>'+
    '<div><label class="text-sm font-medium">Dirección</label><input name="direccion" value="'+esc(v.direccion||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
    '<div><label class="text-sm font-medium">Invitado por</label><select name="invitado_por" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"><option value="">—</option>'+
-     mem.map(function(m){ return '<option value="'+m.id+'"'+(v.invitado_por===m.id?' selected':'')+'>'+esc(m.nombre)+'</option>'; }).join('')+'</select></div>'+
+     mem.map(function(m){ return '<option value="'+m.id+'"'+(v.invitado_por===m.id?' selected':'')+'>'+esc(nomShow(m))+'</option>'; }).join('')+'</select></div>'+
    '<div><label class="text-sm font-medium">¿En qué reunión llegó?</label><select name="meeting_type_id" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"><option value="">—</option>'+
      tipos.map(function(t){ return '<option value="'+t.id+'"'+(v.meeting_type_id===t.id?' selected':'')+'>'+esc(t.icono+' '+t.nombre)+'</option>'; }).join('')+'</select></div>'+
    '<div><label class="text-sm font-medium">Responsable del seguimiento</label><select name="asignado_a" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"><option value="">Sin asignar</option>'+
-     mem.map(function(m){ return '<option value="'+m.id+'"'+(v.asignado_a===m.id?' selected':'')+'>'+esc(m.nombre)+'</option>'; }).join('')+'</select></div>'+
+     mem.map(function(m){ return '<option value="'+m.id+'"'+(v.asignado_a===m.id?' selected':'')+'>'+esc(nomShow(m))+'</option>'; }).join('')+'</select></div>'+
    '<div><label class="text-sm font-medium">Estado</label><select name="estado" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg">'+
      Object.keys(EST_VIS).map(function(k){ return '<option value="'+k+'"'+((v.estado||'nuevo')===k?' selected':'')+'>'+EST_VIS[k][0]+'</option>'; }).join('')+'</select></div>'+
    '<div><label class="text-sm font-medium">Petición de oración</label><textarea name="motivo_oracion" rows="2" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg">'+esc(v.motivo_oracion||'')+'</textarea></div>'+
@@ -1688,7 +1690,7 @@ function formVisita(v){
 
 async function verVisita(id){
   try{
-    var v=(await dbGet('visitors','id=eq.'+id+'&select=*,members!visitors_invitado_por_fkey(nombre),asignado:members!visitors_asignado_a_fkey(nombre),meeting_types(nombre,icono)'))[0];
+    var v=(await dbGet('visitors','id=eq.'+id+'&select=*,members!visitors_invitado_por_fkey(nombre,nombre_display),asignado:members!visitors_asignado_a_fkey(nombre,nombre_display),meeting_types(nombre,icono)'))[0];
     if(!v) return;
     var fu=await dbGet('followups','visitor_id=eq.'+id+'&select=*,profiles(nombre)&order=fecha.desc');
     var e=EST_VIS[v.estado]||EST_VIS.nuevo;
@@ -1700,8 +1702,8 @@ async function verVisita(id){
         '<div class="flex items-center gap-2"><i data-lucide="calendar" class="w-4 h-4 text-slate-400"></i>Visitó el '+fecha(v.fecha_visita)+(v.meeting_types?' · '+esc(v.meeting_types.nombre):'')+'</div>'+
         (v.telefono?'<div class="flex items-center gap-2"><i data-lucide="phone" class="w-4 h-4 text-slate-400"></i>'+esc(v.telefono)+'</div>':'')+
         (v.direccion?'<div class="flex items-center gap-2"><i data-lucide="map-pin" class="w-4 h-4 text-slate-400"></i>'+esc(v.direccion)+'</div>':'')+
-        (v.members?'<div class="flex items-center gap-2"><i data-lucide="user" class="w-4 h-4 text-slate-400"></i>Invitado por '+esc(v.members.nombre)+'</div>':'')+
-        (v.asignado?'<div class="flex items-center gap-2"><i data-lucide="user-check" class="w-4 h-4 text-slate-400"></i>Seguimiento: '+esc(v.asignado.nombre)+'</div>':'')+
+        (v.members?'<div class="flex items-center gap-2"><i data-lucide="user" class="w-4 h-4 text-slate-400"></i>Invitado por '+esc(nomShow(v.members))+'</div>':'')+
+        (v.asignado?'<div class="flex items-center gap-2"><i data-lucide="user-check" class="w-4 h-4 text-slate-400"></i>Seguimiento: '+esc(nomShow(v.asignado))+'</div>':'')+
         (v.motivo_oracion?'<div class="flex items-start gap-2"><i data-lucide="hand-heart" class="w-4 h-4 text-slate-400 mt-0.5"></i><span>'+esc(v.motivo_oracion)+'</span></div>':'')+
         (v.notas?'<div class="flex items-start gap-2"><i data-lucide="sticky-note" class="w-4 h-4 text-slate-400 mt-0.5"></i><span>'+esc(v.notas)+'</span></div>':'')+
       '</div>'+
@@ -1806,7 +1808,7 @@ async function pintarOraciones(){
         '</div></div></div>'+
         (o.detalle?'<p class="text-sm text-slate-600 lc2 mb-2">'+esc(o.detalle)+'</p>':'')+
         '<div class="text-xs text-slate-400 flex items-center gap-1.5"><i data-lucide="user" class="w-3 h-3"></i>'+
-        esc(o.members?o.members.nombre:(o.nombre_externo||'Anónimo'))+' · '+fecha(o.fecha)+'</div></div>';
+        esc(o.members?nomShow(o.members):(o.nombre_externo||'Anónimo'))+' · '+fecha(o.fecha)+'</div></div>';
     }).join('')+'</div>';
     ri();
   }catch(e){ L.innerHTML='<div class="text-sm text-red-600 p-3">'+esc(e.message.slice(0,150))+'</div>'; }
@@ -1824,10 +1826,10 @@ function formOracion(o){
      '<div><label class="text-sm font-medium">Fecha</label><input name="fecha" type="date" value="'+(o.fecha||hoy())+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
    '</div>'+
    '<div><label class="text-sm font-medium">¿De quién es?</label><select name="member_id" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"><option value="">Otra persona (escribir abajo)</option>'+
-     mem.map(function(m){ return '<option value="'+m.id+'"'+(o.member_id===m.id?' selected':'')+'>'+esc(m.nombre)+'</option>'; }).join('')+'</select></div>'+
+     mem.map(function(m){ return '<option value="'+m.id+'"'+(o.member_id===m.id?' selected':'')+'>'+esc(nomShow(m))+'</option>'; }).join('')+'</select></div>'+
    '<div><label class="text-sm font-medium">Nombre (si no es miembro)</label><input name="nombre_externo" value="'+esc(o.nombre_externo||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
    '<div><label class="text-sm font-medium">Responsable de dar seguimiento</label><select name="asignado_a" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"><option value="">—</option>'+
-     mem.map(function(m){ return '<option value="'+m.id+'"'+(o.asignado_a===m.id?' selected':'')+'>'+esc(m.nombre)+'</option>'; }).join('')+'</select></div>'+
+     mem.map(function(m){ return '<option value="'+m.id+'"'+(o.asignado_a===m.id?' selected':'')+'>'+esc(nomShow(m))+'</option>'; }).join('')+'</select></div>'+
    '<div class="space-y-2">'+
      '<label class="flex items-center gap-2 text-sm"><input type="checkbox" name="urgente" '+(o.urgente?'checked':'')+' class="w-4 h-4 accent-red-600">Urgente</label>'+
      '<label class="flex items-start gap-2 text-sm"><input type="checkbox" name="confidencial" '+(o.confidencial?'checked':'')+' class="w-4 h-4 mt-0.5 accent-slate-700"><span>Confidencial <span class="text-xs text-slate-500 block">Solo la verán el pastor, los líderes y quien la registró.</span></span></label>'+
@@ -1847,7 +1849,7 @@ function formOracion(o){
 }
 async function verOracion(id){
   try{
-    var o=(await dbGet('prayer_requests','id=eq.'+id+'&select=*,members!prayer_requests_member_id_fkey(nombre),asignado:members!prayer_requests_asignado_a_fkey(nombre)'))[0];
+    var o=(await dbGet('prayer_requests','id=eq.'+id+'&select=*,members!prayer_requests_member_id_fkey(nombre,nombre_display),asignado:members!prayer_requests_asignado_a_fkey(nombre,nombre_display)'))[0];
     if(!o) return;
     var lg=await dbGet('prayer_log','request_id=eq.'+id+'&select=*,profiles(nombre)&order=created_at.desc&limit=20');
     var c=CAT_ORA[o.categoria]||CAT_ORA.general;
@@ -1859,9 +1861,9 @@ async function verOracion(id){
       '<h3 class="font-bold text-slate-800 text-lg">'+esc(o.titulo)+'</h3>'+
       (o.detalle?'<p class="text-sm text-slate-700 mt-2 whitespace-pre-wrap">'+esc(o.detalle)+'</p>':'')+'</div>'+
       '<div class="bg-slate-50 rounded-xl p-3 mb-4 text-sm space-y-1.5">'+
-        '<div class="flex items-center gap-2"><i data-lucide="user" class="w-4 h-4 text-slate-400"></i>'+esc(o.members?o.members.nombre:(o.nombre_externo||'Anónimo'))+'</div>'+
+        '<div class="flex items-center gap-2"><i data-lucide="user" class="w-4 h-4 text-slate-400"></i>'+esc(o.members?nomShow(o.members):(o.nombre_externo||'Anónimo'))+'</div>'+
         '<div class="flex items-center gap-2"><i data-lucide="calendar" class="w-4 h-4 text-slate-400"></i>'+fecha(o.fecha)+'</div>'+
-        (o.asignado?'<div class="flex items-center gap-2"><i data-lucide="user-check" class="w-4 h-4 text-slate-400"></i>Seguimiento: '+esc(o.asignado.nombre)+'</div>':'')+
+        (o.asignado?'<div class="flex items-center gap-2"><i data-lucide="user-check" class="w-4 h-4 text-slate-400"></i>Seguimiento: '+esc(nomShow(o.asignado))+'</div>':'')+
         (o.testimonio?'<div class="flex items-start gap-2 text-emerald-700"><i data-lucide="sparkles" class="w-4 h-4 mt-0.5"></i><span>'+esc(o.testimonio)+'</span></div>':'')+
       '</div>'+
       '<div class="grid grid-cols-2 gap-2 mb-3">'+
@@ -1960,7 +1962,7 @@ async function cambiarRol(uid){
          '<div class="text-xs text-slate-500">'+r[1]+'</div></div></label>';
      }).join('')+'</div></div>'+
    '<div><label class="text-sm font-medium">Vincular con ficha de miembro</label><select name="member_id" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"><option value="">— Sin vincular —</option>'+
-     mem.map(function(m){ return '<option value="'+m.id+'"'+(us.member_id===m.id?' selected':'')+(m.user_id&&m.user_id!==uid?' disabled':'')+'>'+esc(m.nombre)+(m.user_id&&m.user_id!==uid?' (ya vinculado)':'')+'</option>'; }).join('')+'</select>'+
+     mem.map(function(m){ return '<option value="'+m.id+'"'+(us.member_id===m.id?' selected':'')+(m.user_id&&m.user_id!==uid?' disabled':'')+'>'+esc(nomShow(m))+(m.user_id&&m.user_id!==uid?' (ya vinculado)':'')+'</option>'; }).join('')+'</select>'+
      '<p class="text-xs text-slate-500 mt-1">Necesario para que sea responsable de una Casa de Pan o de una caja.</p></div>'+
    mFoot('mUs')+'</form>');
   document.getElementById('fUs').onsubmit=async function(e){
@@ -2121,7 +2123,7 @@ async function view_decisiones(){
   ri(); await pintarDecisiones();
 }
 async function pintarDecisiones(){
-  var d=await dbGet('decisiones','select=*,members(nombre),meeting_types(nombre,icono)&order=fecha.desc,created_at.desc&limit=200');
+  var d=await dbGet('decisiones','select=*,members(nombre,nombre_display),meeting_types(nombre,icono)&order=fecha.desc,created_at.desc&limit=200');
   var anio=new Date().getFullYear(), res={};
   d.forEach(function(x){ if(new Date(x.fecha+'T00:00:00').getFullYear()===anio){ res[x.tipo]=(res[x.tipo]||0)+1; } });
   var rc=document.getElementById('decResumen');
@@ -2133,7 +2135,7 @@ async function pintarDecisiones(){
   if(!d.length){ lc.innerHTML=vacio('sprout','A\u00fan no hay decisiones registradas.'); ri(); return; }
   var editable=puede(['admin','pastor','lider','servidor']), borrable=puede(['admin','pastor','lider']);
   lc.innerHTML=d.map(function(x){ var t=DEC_TIPOS[x.tipo]||DEC_TIPOS.otro;
-    var quien=x.members?x.members.nombre:(x.nombre_externo||'\u2014');
+    var quien=x.members?nomShow(x.members):(x.nombre_externo||'\u2014');
     return '<div class="bg-white border border-slate-200 rounded-xl p-3 flex items-start gap-3">'+
       '<div class="w-10 h-10 rounded-xl bg-'+t[2]+'-100 text-'+t[2]+'-700 flex items-center justify-center flex-shrink-0"><i data-lucide="'+t[1]+'" class="w-5 h-5"></i></div>'+
       '<div class="flex-1 min-w-0"><div class="font-semibold text-slate-800 truncate">'+esc(quien)+'</div>'+
@@ -2277,7 +2279,7 @@ async function view_pastoral(){
 async function pintarPastoral(){
   try{
     var res=await dbGet('v_stats_ingresos_pastorales','select=*&order=orden');
-    var d=await dbGet('ingresos_pastorales','select=*,members(nombre)&order=fecha.desc,created_at.desc&limit=200');
+    var d=await dbGet('ingresos_pastorales','select=*,members(nombre,nombre_display)&order=fecha.desc,created_at.desc&limit=200');
     var totMes=res.reduce(function(a,b){return a+Number(b.total_mes);},0);
     var totAnio=res.reduce(function(a,b){return a+Number(b.total_anio);},0);
     var mesNombre=new Date().toLocaleDateString('es-HN',{month:'long'});
@@ -2298,7 +2300,7 @@ async function pintarPastoral(){
     if(!d.length){ lc.innerHTML='<div class="mt-5">'+vacio('hand-coins','Aún no hay ingresos registrados. Toca \u201cNuevo ingreso\u201d para empezar.')+'</div>'; ri(); return; }
     var borrable=puede(['admin','pastor']);
     lc.innerHTML='<h4 class="text-sm font-semibold text-slate-500 mt-5 mb-2">Movimientos recientes</h4>'+d.map(function(x){ var t=IP_TIPOS[x.tipo]||IP_TIPOS.otro;
-      var quien=x.members?x.members.nombre:(x.nombre_externo||'');
+      var quien=x.members?nomShow(x.members):(x.nombre_externo||'');
       return '<div class="bg-white border border-slate-200 rounded-xl p-3 flex items-center gap-3">'+
         '<div class="w-10 h-10 rounded-xl bg-'+t[2]+'-100 text-'+t[2]+'-700 flex items-center justify-center flex-shrink-0"><i data-lucide="'+t[1]+'" class="w-5 h-5"></i></div>'+
         '<div class="flex-1 min-w-0"><div class="font-semibold text-slate-800">'+dinero(x.monto)+' <span class="text-xs font-normal text-slate-400">'+esc(t[0])+'</span></div>'+
@@ -3722,7 +3724,7 @@ async function descargarInforme(){
 async function pintarRecibos(){
   var b=document.getElementById('tzBody'); b.innerHTML=spin(); ri();
   try{
-    var d=await dbGet('recibos','anio=eq.'+FZ.anio+'&select=*,members(nombre)&order=numero.desc&limit=100');
+    var d=await dbGet('recibos','anio=eq.'+FZ.anio+'&select=*,members(nombre,nombre_display)&order=numero.desc&limit=100');
     var h='<div class="flex items-center gap-2 mb-4">'+
       '<select onchange="FZ.anio=parseInt(this.value);pintarRecibos()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium">'+
       anios().map(function(a){ return '<option value="'+a+'"'+(a===FZ.anio?' selected':'')+'>Año '+a+'</option>'; }).join('')+'</select>'+
@@ -3735,7 +3737,7 @@ async function pintarRecibos(){
       h+='<div class="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">'+d.map(function(r){
         return '<button onclick="verRecibo(\''+r.id+'\')" class="w-full text-left p-3.5 flex items-center gap-3 hover:bg-slate-50 '+(r.anulado?'opacity-50':'')+'">'+
           '<div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0 font-bold text-xs">Nº'+r.numero+'</div>'+
-          '<div class="flex-1 min-w-0"><div class="font-semibold text-slate-800 truncate">'+esc(r.members?r.members.nombre:r.nombre_aportante)+(r.anulado?' <span class="text-red-500 text-xs">(anulado)</span>':'')+'</div>'+
+          '<div class="flex-1 min-w-0"><div class="font-semibold text-slate-800 truncate">'+esc(r.members?nomShow(r.members):r.nombre_aportante)+(r.anulado?' <span class="text-red-500 text-xs">(anulado)</span>':'')+'</div>'+
           '<div class="text-xs text-slate-500">'+esc(r.concepto)+' · '+fecha(r.fecha)+'</div></div>'+
           '<div class="text-right flex-shrink-0"><div class="font-bold text-emerald-700">'+dinero(r.monto)+'</div></div>'+
           '<i data-lucide="chevron-right" class="w-4 h-4 text-slate-300"></i></button>';
@@ -3751,7 +3753,7 @@ async function formRecibo(){
   modal('mRe', mHead('Emitir recibo Nº '+num,'mRe')+
    '<form id="fRe" class="p-4 space-y-3">'+
    '<div><label class="text-sm font-medium">Aportante (miembro)</label><select name="member_id" onchange="reNombre(this)" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"><option value="">— Escribir nombre abajo —</option>'+
-     mem.map(function(m){ return '<option value="'+m.id+'" data-n="'+esc(m.nombre)+'">'+esc(m.nombre)+'</option>'; }).join('')+'</select></div>'+
+     mem.map(function(m){ return '<option value="'+m.id+'" data-n="'+esc(nomShow(m))+'">'+esc(nomShow(m))+'</option>'; }).join('')+'</select></div>'+
    '<div><label class="text-sm font-medium">Nombre en el recibo *</label><input id="reNom" name="nombre_aportante" required class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
    '<div class="grid grid-cols-2 gap-3">'+
      '<div><label class="text-sm font-medium">Monto *</label><input name="monto" type="number" step="0.01" min="0" required inputmode="decimal" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
@@ -3774,14 +3776,14 @@ async function formRecibo(){
 }
 function reNombre(sel){ var o=sel.options[sel.selectedIndex]; var n=o.getAttribute('data-n'); if(n) document.getElementById('reNom').value=n; }
 async function verRecibo(id){
-  var r=(await dbGet('recibos','id=eq.'+id+'&select=*,members(nombre),profiles(nombre)'))[0];
+  var r=(await dbGet('recibos','id=eq.'+id+'&select=*,members(nombre,nombre_display),profiles(nombre)'))[0];
   if(!r) return;
   modal('mRd', mHead('Recibo Nº '+r.numero,'mRd')+'<div class="p-4">'+
     '<div id="reciboDoc" class="border-2 border-dashed border-slate-300 rounded-xl p-5 mb-4">'+
     '<div class="flex items-center justify-between mb-3"><div class="flex items-center gap-2"><div class="w-9 h-9 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold">A</div><div><div class="font-bold text-slate-800 text-sm">Iglesia ADULAM</div><div class="text-[10px] text-slate-400">Recibo de aportación</div></div></div>'+
     '<div class="text-right"><div class="text-xs text-slate-400">Nº</div><div class="font-bold text-lg text-indigo-700">'+r.numero+'</div></div></div>'+
     '<div class="text-sm space-y-1.5 border-t border-slate-100 pt-3">'+
-    '<div class="flex justify-between"><span class="text-slate-500">Recibí de</span><span class="font-semibold">'+esc(r.members?r.members.nombre:r.nombre_aportante)+'</span></div>'+
+    '<div class="flex justify-between"><span class="text-slate-500">Recibí de</span><span class="font-semibold">'+esc(r.members?nomShow(r.members):r.nombre_aportante)+'</span></div>'+
     '<div class="flex justify-between"><span class="text-slate-500">Concepto</span><span>'+esc(r.concepto)+'</span></div>'+
     '<div class="flex justify-between"><span class="text-slate-500">Fecha</span><span>'+fecha(r.fecha)+'</span></div>'+
     '<div class="flex justify-between"><span class="text-slate-500">Método</span><span class="capitalize">'+esc(r.metodo)+'</span></div>'+
@@ -3796,7 +3798,7 @@ async function anularRecibo(id){
   catch(e){ toast(e.message.slice(0,140),'error'); }
 }
 async function imprimirRecibo(id){
-  var r=(await dbGet('recibos','id=eq.'+id+'&select=*,members(nombre)'))[0];
+  var r=(await dbGet('recibos','id=eq.'+id+'&select=*,members(nombre,nombre_display)'))[0];
   var win=window.open('','_blank'); if(!win){ toast('Permite ventanas emergentes','warning'); return; }
   win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Recibo Nº '+r.numero+'</title>'+
     '<style>*{font-family:Arial,sans-serif;color:#1e293b}body{max-width:480px;margin:0 auto;padding:40px}'+
@@ -3808,7 +3810,7 @@ async function imprimirRecibo(id){
     '@media print{body{padding:10px}}</style></head><body><div class="rec">'+
     '<div class="hd"><div><span class="logo">A</span><div style="margin-top:6px;font-weight:bold">Iglesia ADULAM</div><div style="font-size:11px;color:#94a3b8">Recibo de aportación</div></div>'+
     '<div style="text-align:right"><div style="font-size:11px;color:#94a3b8">RECIBO Nº</div><div class="num">'+r.numero+'</div><div style="font-size:11px;color:#94a3b8">Año '+r.anio+'</div></div></div>'+
-    '<div class="row"><span style="color:#64748b">Recibí de</span><b>'+esc(r.members?r.members.nombre:r.nombre_aportante)+'</b></div>'+
+    '<div class="row"><span style="color:#64748b">Recibí de</span><b>'+esc(r.members?nomShow(r.members):r.nombre_aportante)+'</b></div>'+
     '<div class="row"><span style="color:#64748b">Concepto</span><span>'+esc(r.concepto)+'</span></div>'+
     '<div class="row"><span style="color:#64748b">Fecha</span><span>'+new Date(r.fecha+'T12:00:00').toLocaleDateString('es-HN',{day:'numeric',month:'long',year:'numeric'})+'</span></div>'+
     '<div class="row"><span style="color:#64748b">Método</span><span style="text-transform:capitalize">'+esc(r.metodo)+'</span></div>'+
@@ -3995,7 +3997,7 @@ async function borrarCurso(id,n){ if(!confirm('¿Eliminar el curso "'+n+'" con t
 async function verCurso(cid){
   var c=(await dbGet('discipleship_courses','id=eq.'+cid+'&select=*'))[0];
   var lec=await dbGet('discipleship_lessons','course_id=eq.'+cid+'&select=*&order=numero');
-  var coh=await dbGet('discipleship_cohorts','course_id=eq.'+cid+'&select=*,members!discipleship_cohorts_maestro_id_fkey(nombre)&order=fecha_inicio.desc');
+  var coh=await dbGet('discipleship_cohorts','course_id=eq.'+cid+'&select=*,members!discipleship_cohorts_maestro_id_fkey(nombre,nombre_display)&order=fecha_inicio.desc');
   var k=cc(c.color);
   var p=document.getElementById('page');
   p.innerHTML='<button onclick="verCursos()" class="text-sm text-slate-500 hover:text-indigo-600 mb-3 flex items-center gap-1"><i data-lucide="arrow-left" class="w-4 h-4"></i>Volver a cursos</button>'+
@@ -4038,7 +4040,7 @@ async function verCurso(cid){
        '<span class="text-xs px-2 py-0.5 rounded-full '+bd+' flex-shrink-0">'+esc(o.estado)+'</span></div>'+
        '<div class="text-xs text-slate-500 space-y-0.5">'+
        (o.fecha_inicio?'<div class="flex items-center gap-1"><i data-lucide="calendar" class="w-3 h-3"></i>'+fecha(o.fecha_inicio)+' → '+(o.fecha_fin?fecha(o.fecha_fin):'?')+'</div>':'')+
-       (o.members?'<div class="flex items-center gap-1"><i data-lucide="user-check" class="w-3 h-3"></i>'+esc(o.members.nombre)+'</div>':'')+
+       (o.members?'<div class="flex items-center gap-1"><i data-lucide="user-check" class="w-3 h-3"></i>'+esc(nomShow(o.members))+'</div>':'')+
        '</div></div>';
    }).join(''):'<p class="text-slate-400 text-sm col-span-full text-center py-4">Sin promociones.</p>')+'</div></div>';
   ri();
@@ -4079,7 +4081,7 @@ async function formPromo(cid,o){
      '<div><label class="text-xs text-slate-500">Inicio</label><input name="fecha_inicio" type="date" value="'+esc(o.fecha_inicio||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
      '<div><label class="text-xs text-slate-500">Fin</label><input name="fecha_fin" type="date" value="'+esc(o.fecha_fin||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div></div>'+
    '<div><label class="text-sm font-medium">Maestro / Facilitador</label><select name="maestro_id" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"><option value="">Sin asignar</option>'+
-     mem.map(function(m){return '<option value="'+m.id+'"'+(o.maestro_id===m.id?' selected':'')+'>'+esc(m.nombre)+'</option>';}).join('')+'</select></div>'+
+     mem.map(function(m){return '<option value="'+m.id+'"'+(o.maestro_id===m.id?' selected':'')+'>'+esc(nomShow(m))+'</option>';}).join('')+'</select></div>'+
    '<div><label class="text-sm font-medium">Estado</label><select name="estado" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg">'+
      ['activo','finalizado','cancelado'].map(function(x){return '<option value="'+x+'"'+(o.estado===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select></div>'+
    mFoot('mPr')+'</form>');
@@ -4096,7 +4098,7 @@ async function formPromo(cid,o){
 }
 
 async function verPromo(id){
-  var o=(await dbGet('discipleship_cohorts','id=eq.'+id+'&select=*,discipleship_courses(*),members!discipleship_cohorts_maestro_id_fkey(nombre)'))[0];
+  var o=(await dbGet('discipleship_cohorts','id=eq.'+id+'&select=*,discipleship_courses(*),members!discipleship_cohorts_maestro_id_fkey(nombre,nombre_display)'))[0];
   var c=o.discipleship_courses, k=cc(c.color);
   var lec=await dbGet('discipleship_lessons','course_id=eq.'+c.id+'&select=*&order=numero');
   var par=await dbGet('v_discipleship_progress','cohort_id=eq.'+id+'&select=*&order=miembro_nombre');
@@ -4110,7 +4112,7 @@ async function verPromo(id){
    '<h3 class="text-xl sm:text-2xl font-bold">'+esc(o.nombre)+'</h3>'+
    '<div class="text-xs sm:text-sm text-slate-600 mt-1 flex flex-wrap gap-3">'+
    (o.fecha_inicio?'<span>'+fecha(o.fecha_inicio)+' → '+(o.fecha_fin?fecha(o.fecha_fin):'?')+'</span>':'')+
-   (o.members?'<span>'+esc(o.members.nombre)+'</span>':'')+'</div></div>'+
+   (o.members?'<span>'+esc(nomShow(o.members))+'</span>':'')+'</div></div>'+
    '<div class="flex gap-1">'+
    (puede(['pastor','lider'])?'<button onclick=\'formPromo("'+c.id+'",'+JSON.stringify(o).replace(/'/g,"&#39;")+')\' class="p-2 bg-white border border-slate-200 rounded-lg"><i data-lucide="pencil" class="w-4 h-4"></i></button>':'')+
    (puede(['pastor'])?'<button onclick="borrarPromo(\''+o.id+'\',\''+c.id+'\')" class="p-2 bg-red-100 text-red-700 rounded-lg"><i data-lucide="trash-2" class="w-4 h-4"></i></button>':'')+
@@ -4154,7 +4156,7 @@ async function agregarParticipantes(cid){
     '<div class="relative mb-3"><i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>'+
     '<input id="fltP" placeholder="Filtrar..." class="w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
     '<div id="listP" class="max-h-80 overflow-y-auto border border-slate-200 rounded-xl p-2 space-y-1">'+
-    disp.map(function(m){ return '<label class="flex items-center gap-2 p-3 hover:bg-indigo-50 rounded-lg cursor-pointer"><input type="checkbox" value="'+m.id+'" class="chkP accent-indigo-600 w-4 h-4"><span class="text-sm">'+esc(m.nombre)+'</span></label>'; }).join('')+
+    disp.map(function(m){ return '<label class="flex items-center gap-2 p-3 hover:bg-indigo-50 rounded-lg cursor-pointer"><input type="checkbox" value="'+m.id+'" class="chkP accent-indigo-600 w-4 h-4"><span class="text-sm">'+esc(nomShow(m))+'</span></label>'; }).join('')+
     '</div><div class="flex gap-2 mt-4"><button onclick="closeModal(\'mAP\')" class="flex-1 py-3 bg-slate-100 rounded-xl font-medium">Cancelar</button>'+
     '<button onclick="guardarParticipantes(\''+cid+'\')" class="flex-1 py-3 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-semibold">Agregar</button></div></div>');
   document.getElementById('fltP').oninput=function(e){
@@ -4235,7 +4237,7 @@ async function view_social(){
 }
 async function pintarPosts(){
   var est=document.getElementById('soEstado').value;
-  var q='select=*,members(nombre)&order=fecha_programada.asc.nullslast';
+  var q='select=*,members(nombre,nombre_display)&order=fecha_programada.asc.nullslast';
   if(est) q+='&estado=eq.'+est;
   var d=await dbGet('social_posts',q);
   var cl={pendiente:'bg-slate-100 text-slate-700',en_diseno:'bg-amber-100 text-amber-700',aprobado:'bg-blue-100 text-blue-700',publicado:'bg-emerald-100 text-emerald-700'};
@@ -4252,7 +4254,7 @@ async function pintarPosts(){
       '<p class="text-sm text-slate-600 mb-3 lc2">'+esc(p.descripcion||'')+'</p>'+
       '<div class="text-xs text-slate-500 space-y-1">'+
       (p.fecha_programada?'<div class="flex items-center gap-1"><i data-lucide="calendar" class="w-3 h-3"></i>'+fecha(p.fecha_programada)+'</div>':'')+
-      (p.members?'<div class="flex items-center gap-1"><i data-lucide="user" class="w-3 h-3"></i>'+esc(p.members.nombre)+'</div>':'')+'</div>'+
+      (p.members?'<div class="flex items-center gap-1"><i data-lucide="user" class="w-3 h-3"></i>'+esc(nomShow(p.members))+'</div>':'')+'</div>'+
       '<div class="flex gap-1 mt-3">'+
       '<button onclick="editarPost(\''+p.id+'\')" class="flex-1 py-2 text-sm bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>'+
       '<button onclick="avanzarPost(\''+p.id+'\',\''+p.estado+'\')" class="flex-1 py-2 text-sm bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-lg font-medium flex items-center justify-center gap-1"><i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>Avanzar</button>'+
@@ -4275,7 +4277,7 @@ function formPost(p){
        ['pendiente','en_diseno','aprobado','publicado'].map(function(x){return '<option value="'+x+'"'+(p.estado===x?' selected':'')+'>'+x.replace('_',' ')+'</option>';}).join('')+'</select></div></div>'+
    '<div><label class="text-sm font-medium">Fecha programada</label><input name="fecha_programada" type="date" value="'+esc(p.fecha_programada||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
    '<div><label class="text-sm font-medium">Responsable</label><select name="responsable_id" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"><option value="">Sin responsable</option>'+
-     mem.map(function(m){return '<option value="'+m.id+'"'+(p.responsable_id===m.id?' selected':'')+'>'+esc(m.nombre)+'</option>';}).join('')+'</select></div>'+
+     mem.map(function(m){return '<option value="'+m.id+'"'+(p.responsable_id===m.id?' selected':'')+'>'+esc(nomShow(m))+'</option>';}).join('')+'</select></div>'+
    '<div><label class="text-sm font-medium">URL de imagen</label><input name="imagen_url" placeholder="https://..." value="'+esc(p.imagen_url||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
    mFoot('mSo')+'</form>');
   document.getElementById('fSo').onsubmit=async function(e){
@@ -4337,7 +4339,7 @@ async function simularWhatsapp(){
   }catch(e){ toast(e.message.slice(0,120),'error'); }
 }
 async function pintarLogs(){
-  var d=await dbGet('automation_logs','select=*,members(nombre,telefono)&order=created_at.desc&limit=30');
+  var d=await dbGet('automation_logs','select=*,members(nombre,nombre_display,telefono)&order=created_at.desc&limit=30');
   var c=document.getElementById('auLogs');
   if(!d.length){ c.innerHTML='<div class="bg-white rounded-2xl border p-8 text-center text-slate-400"><i data-lucide="inbox" class="w-10 h-10 mx-auto mb-2 opacity-40"></i><p>Sin alertas registradas.</p></div>'; ri(); return; }
   var ic={inactividad:'user-minus',sin_discipulador:'alert-triangle',nuevo_miembro:'sparkles'};
@@ -4346,7 +4348,7 @@ async function pintarLogs(){
       '<div class="w-9 h-9 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center flex-shrink-0"><i data-lucide="'+(ic[l.tipo]||'bell')+'" class="w-4 h-4"></i></div>'+
       '<div class="flex-1 min-w-0"><div class="text-sm text-slate-700">'+esc(l.mensaje)+'</div>'+
       '<div class="text-xs text-slate-400 flex flex-wrap gap-x-3 mt-1"><span>'+fecha(l.created_at)+'</span>'+
-      (l.members?'<span>'+esc(l.members.nombre)+'</span>':'')+
+      (l.members?'<span>'+esc(nomShow(l.members))+'</span>':'')+
       (l.members&&l.members.telefono?'<span>'+esc(l.members.telefono)+'</span>':'')+'</div></div>'+
       '<div class="flex flex-col items-end gap-1 flex-shrink-0"><span class="text-xs '+(l.enviado?'text-emerald-600':'text-amber-600')+'">'+(l.enviado?'Enviado':'Pendiente')+'</span>'+
       (!l.enviado?'<button onclick="marcarEnviado(\''+l.id+'\')" class="text-xs px-2 py-1 bg-emerald-100 text-emerald-700 rounded">Marcar</button>':'')+'</div></div>';
