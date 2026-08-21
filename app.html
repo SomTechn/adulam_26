@@ -747,17 +747,17 @@ function formMiembro(m){
 
       var foto=fd.get('foto');
       if(foto && foto.size>0){
-        if(foto.size>2*1024*1024){ toast('La foto supera 2MB, se guarda sin foto','warning'); }
-        else {
-          // La foto NUNCA debe impedir guardar al miembro
-          try{
-            var ext=(foto.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,5)||'jpg';
-            var path='members/'+Date.now()+'_'+Math.random().toString(36).slice(2,8)+'.'+ext;
-            var up=await req('/storage/v1/object/member-photos/'+path,{ method:'POST', headers:{'Content-Type':foto.type||'image/jpeg'}, body:foto },20000);
+        // La foto NUNCA debe impedir guardar al miembro
+        try{
+          var fotoSubir=await comprimirImagen(foto);
+          if(fotoSubir.size>3*1024*1024){ toast('La foto es muy pesada aun comprimida, se guarda sin ella','warning'); }
+          else {
+            var path='members/'+Date.now()+'_'+Math.random().toString(36).slice(2,8)+'.jpg';
+            var up=await req('/storage/v1/object/member-photos/'+path,{ method:'POST', headers:{'Content-Type':'image/jpeg'}, body:fotoSubir },20000);
             if(up.ok) body.foto_url=URL_BASE+'/storage/v1/object/public/member-photos/'+path;
             else toast('No se pudo subir la foto, se guarda sin ella','warning');
-          }catch(fe){ toast('Foto no subida ('+fe.message.slice(0,40)+'), se guarda sin ella','warning'); }
-        }
+          }
+        }catch(fe){ toast('Foto no subida ('+fe.message.slice(0,40)+'), se guarda sin ella','warning'); }
       }
 
       var mid=m.id;
