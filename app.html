@@ -3089,7 +3089,7 @@ function listaMovs(d, verCaja){
     return '<button onclick="verMovimiento(\''+m.id+'\')" class="w-full text-left p-4 flex items-start gap-3 hover:bg-slate-50 active:bg-slate-100 transition">'+
       '<div class="w-9 h-9 rounded-xl '+(ing?'bg-emerald-100 text-emerald-700':'bg-red-100 text-red-700')+' flex items-center justify-center flex-shrink-0"><i data-lucide="'+(m.categoria_icono||(ing?'arrow-down-to-line':'arrow-up-from-line'))+'" class="w-4 h-4"></i></div>'+
       '<div class="flex-1 min-w-0"><div class="font-semibold text-slate-800 truncate">'+esc(m.categoria_nombre||m.categoria||'Sin categoría')+'</div>'+
-      '<div class="text-xs text-slate-500 truncate">'+fecha(m.fecha)+(verCaja?' · '+esc(m.caja_nombre):'')+(m.registrado_por_nombre?' · '+esc(m.registrado_por_nombre.split(' ')[0]):'')+'</div>'+
+      '<div class="text-xs text-slate-500 truncate">'+fecha(m.fecha)+(verCaja?' · '+esc(m.caja_nombre):'')+(m.registrado_por_nombre?' · '+esc(m.registrado_por_nombre.split(' ')[0]):'')+(m.n_comprobantes>0?' · <i data-lucide="paperclip" class="w-3 h-3 inline text-indigo-500"></i> '+m.n_comprobantes:'')+'</div>'+
       (m.descripcion?'<div class="text-sm text-slate-600 truncate mt-0.5">'+esc(m.descripcion)+'</div>':'')+'</div>'+
       '<div class="text-right flex-shrink-0"><div class="font-bold '+(ing?'text-emerald-700':'text-red-700')+'">'+(ing?'+':'−')+dinero(m.monto)+'</div>'+
       '<div class="text-[11px] text-slate-400">Saldo '+dinero(m.saldo_despues)+'</div></div>'+
@@ -3130,10 +3130,14 @@ async function verMovimiento(id){
         dRow('scale','Saldo de la caja tras este movimiento','<span class="font-bold text-base">'+dinero(m.saldo_despues)+'</span>')+
         dRow('hash','ID','<span class="font-mono text-[11px] text-slate-400">'+esc(m.id)+'</span>')+
       '</div>'+
+      '<div class="mt-4"><div class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 flex items-center gap-1.5"><i data-lucide="paperclip" class="w-3.5 h-3.5"></i>Comprobantes</div>'+
+        '<div id="compList" class="p-1"><div class="text-xs text-slate-400">Cargando...</div></div></div>'+
       (edit?'<div class="grid grid-cols-2 gap-2 mt-4">'+
         '<button onclick="editarMovimiento(\''+m.id+'\')" class="py-3 bg-slate-100 hover:bg-slate-200 rounded-xl font-medium flex items-center justify-center gap-2"><i data-lucide="pencil" class="w-4 h-4"></i>Editar</button>'+
         '<button onclick="borrarMovimiento(\''+m.id+'\')" class="py-3 bg-red-50 text-red-700 hover:bg-red-100 rounded-xl font-medium flex items-center justify-center gap-2"><i data-lucide="trash-2" class="w-4 h-4"></i>Eliminar</button></div>':'')+
       '</div>');
+    var cl=document.getElementById('compList');
+    if(cl) pintarComprobantes(m.id, cl, edit);
   }catch(e){ toast(e.message.slice(0,120),'error'); }
 }
 async function editarMovimiento(id){
@@ -3145,6 +3149,76 @@ async function borrarMovimiento(id){
   if(!confirm('¿Eliminar este movimiento? El saldo de la caja se recalculará.')) return;
   try{ await dbDel('treasury','id=eq.'+id); closeModal('mDet'); toast('Movimiento eliminado','success'); await tzRefrescar(); }
   catch(e){ toast(e.message.slice(0,140),'error'); }
+}
+
+/* ----- Comprobantes (respaldo fotográfico de movimientos) ----- */
+// Comprime imágenes en el navegador antes de subir; PDFs pasan sin tocar.
+function comprimirImagen(file){
+  return new Promise(function(resolve){
+    if(!file || file.type==='application/pdf' || !/^image\//.test(file.type)){ resolve(file); return; }
+    try{
+      var img=new Image(), url=URL.createObjectURL(file);
+      img.onload=function(){
+        var max=1600, w=img.width, h=img.height;
+        if(w>max||h>max){ if(w>h){ h=Math.round(h*max/w); w=max; } else { w=Math.round(w*max/h); h=max; } }
+        var cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+        cv.getContext('2d').drawImage(img,0,0,w,h);
+        URL.revokeObjectURL(url);
+        cv.toBlob(function(blob){ resolve(blob&&blob.size<file.size?blob:file); }, 'image/jpeg', 0.7);
+      };
+      img.onerror=function(){ URL.revokeObjectURL(url); resolve(file); };
+      img.src=url;
+    }catch(e){ resolve(file); }
+  });
+}
+// Sube un archivo al bucket privado y registra la fila en comprobantes.
+async function subirComprobante(file, cajaId, treasuryId){
+  var esPdf=file.type==='application/pdf';
+  var blob=await comprimirImagen(file);
+  var ext=esPdf?'pdf':'jpg';
+  var path=cajaId+'/'+treasuryId+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,7)+'.'+ext;
+  var ct=esPdf?'application/pdf':'image/jpeg';
+  var up=await req('/storage/v1/object/comprobantes/'+path,{ method:'POST', headers:{'Content-Type':ct}, body:blob },30000);
+  if(!up.ok){ throw new Error('No se pudo subir el archivo'); }
+  await dbPost('comprobantes',{ treasury_id:treasuryId, caja_id:cajaId, storage_path:path,
+    nombre_archivo:(file.name||'comprobante').slice(0,120), mime_type:ct, tamano_bytes:(blob.size||file.size||null),
+    subido_por:(S.user?S.user.id:null) }, 'return=minimal');
+}
+// Pide una URL firmada temporal (60 min) para ver un objeto privado.
+async function urlFirmadaComprobante(path){
+  var r=await req('/storage/v1/object/sign/comprobantes/'+path,{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ expiresIn:3600 }) });
+  if(!r.ok) throw new Error('No se pudo generar el enlace');
+  var d=await r.json();
+  return URL_BASE+'/storage/v1'+d.signedURL;
+}
+async function abrirComprobante(path){
+  try{ var u=await urlFirmadaComprobante(path); window.open(u,'_blank'); }
+  catch(e){ toast('No se pudo abrir el comprobante','error'); }
+}
+async function borrarComprobante(id, path, treasuryId){
+  if(!confirm('¿Eliminar este comprobante?')) return;
+  try{
+    await dbDel('comprobantes','id=eq.'+id);
+    try{ await req('/storage/v1/object/comprobantes/'+path,{ method:'DELETE' }); }catch(e){}
+    toast('Comprobante eliminado','success');
+    var cont=document.getElementById('compList');
+    if(cont){ await pintarComprobantes(treasuryId, cont, true); }
+  }catch(e){ toast('No se pudo eliminar','error'); }
+}
+// Renderiza la lista de comprobantes de un movimiento dentro de un contenedor.
+async function pintarComprobantes(treasuryId, cont, conBorrar){
+  try{
+    var d=await dbGet('comprobantes','treasury_id=eq.'+treasuryId+'&select=*&order=created_at.asc');
+    if(!d.length){ cont.innerHTML='<p class="text-xs text-slate-400">Sin comprobantes adjuntos.</p>'; ri(); return; }
+    cont.innerHTML='<div class="flex flex-wrap gap-2">'+d.map(function(c){
+      var esPdf=(c.mime_type==='application/pdf');
+      return '<div class="relative group">'+
+        '<button onclick="abrirComprobante(\''+esc(c.storage_path)+'\')" class="w-16 h-16 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 flex items-center justify-center overflow-hidden" title="'+esc(c.nombre_archivo||'')+'">'+
+          (esPdf?'<i data-lucide="file-text" class="w-6 h-6 text-red-500"></i>':'<i data-lucide="image" class="w-6 h-6 text-indigo-500"></i>')+'</button>'+
+        (conBorrar?'<button onclick="borrarComprobante(\''+c.id+'\',\''+esc(c.storage_path)+'\',\''+treasuryId+'\')" class="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center shadow"><i data-lucide="x" class="w-3 h-3"></i></button>':'')+
+      '</div>';
+    }).join('')+'</div>'; ri();
+  }catch(e){ cont.innerHTML='<p class="text-xs text-red-500">No se pudieron cargar los comprobantes.</p>'; }
 }
 
 /* ----- Formulario de movimiento ----- */
@@ -3178,19 +3252,37 @@ async function formMovimiento(cajaId, tipo, mov){
    '<div><label class="text-sm font-medium">Referencia / N° recibo</label><input name="referencia" value="'+esc(mov.referencia||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
    '<div><label class="text-sm font-medium">Descripción</label><input name="descripcion" value="'+esc(mov.descripcion||'')+'" placeholder="Ej: Ofrenda del culto dominical" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
    '<div><label class="text-sm font-medium">Notas</label><textarea name="notas" rows="2" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg">'+esc(mov.notas||'')+'</textarea></div>'+
+   '<div class="pt-1"><label class="text-sm font-medium flex items-center gap-1.5"><i data-lucide="paperclip" class="w-4 h-4"></i>Comprobantes <span class="text-xs text-slate-400 font-normal">(fotos o PDF, opcional)</span></label>'+
+     (mov.id?'<div id="compList" class="mt-2 mb-2"></div>':'')+
+     '<input name="comprobantes" type="file" accept="image/*,application/pdf" multiple capture="environment" class="w-full mt-1 text-sm file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700">'+
+     '<p class="text-xs text-slate-500 mt-1">Puedes adjuntar varios. Las fotos se comprimen automáticamente.</p></div>'+
    mFoot('mMv',mov.id?'Guardar cambios':'Registrar')+'</form>');
+  if(mov.id){ var cl=document.getElementById('compList'); if(cl) pintarComprobantes(mov.id, cl, puedeMover(cajaPorId(cid))); }
   document.getElementById('fMv').onsubmit=async function(e){
     e.preventDefault();
+    var btn=e.target.querySelector('button[type=submit]'); if(btn){ btn.disabled=true; }
     try{
       var fd=new FormData(e.target);
       var b={ caja_id:fd.get('caja_id'), tipo:fd.get('tipo'), categoria_id:fd.get('categoria_id')||null,
               monto:parseFloat(fd.get('monto')), fecha:fd.get('fecha'), metodo:fd.get('metodo')||'efectivo',
               referencia:fd.get('referencia')||null, descripcion:fd.get('descripcion')||null, notas:fd.get('notas')||null };
+      var tid=mov.id;
       if(mov.id) await dbPatch('treasury','id=eq.'+mov.id,b);
-      else { b.registrado_por=S.user.id; await dbPost('treasury',b); }
+      else { b.registrado_por=S.user.id; var res=await dbPost('treasury',b); tid=(res&&res[0])?res[0].id:null; }
+      // Subir comprobantes nuevos (si los hay). No deben impedir guardar el movimiento.
+      var files=e.target.querySelector('input[name=comprobantes]');
+      var lista=files&&files.files?Array.prototype.slice.call(files.files):[];
+      if(tid && lista.length){
+        var okc=0, errc=0;
+        for(var i=0;i<lista.length;i++){
+          if(lista[i].size>5*1024*1024){ errc++; continue; }
+          try{ await subirComprobante(lista[i], b.caja_id, tid); okc++; }catch(ce){ errc++; }
+        }
+        if(errc) toast(okc+' comprobante(s) subido(s), '+errc+' con error','warning');
+      }
       toast(mov.id?'Movimiento actualizado':'Movimiento registrado','success');
       closeModal('mMv'); await tzRefrescar();
-    }catch(err){ toast(err.message.slice(0,140),'error'); }
+    }catch(err){ if(btn){ btn.disabled=false; } toast(err.message.slice(0,140),'error'); }
   };
 }
 
