@@ -2285,20 +2285,23 @@ var IP_TIPOS = {
   ofrenda_especial:['Ofrenda especial','gift','violet'],
   otro:['Otro','circle-dollar-sign','slate']
 };
+var IPF={ tab:'mov', mes:'', anio:(new Date()).getFullYear(), desde:'', hasta:'', miembro:'', tipo:'', montoMin:'', montoMax:'', orden:'fecha_desc', agrupar:'mes' };
 async function view_pastoral(){
   var p=document.getElementById('page');
   if(!puede(['admin','pastor'])){ p.innerHTML=vacio('lock','Este módulo es exclusivo del pastor.'); ri(); return; }
+  var tab=function(id,ic,lab){ return '<button onclick="IPF.tab=\''+id+'\';pintarPastoralTab()" class="flex-1 py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 '+(IPF.tab===id?'bg-indigo-600 text-white':'bg-white text-slate-600')+'"><i data-lucide="'+ic+'" class="w-4 h-4"></i>'+lab+'</button>'; };
   p.innerHTML='<div class="mb-4 flex items-center justify-between gap-2">'+
       '<button onclick="formIngresoPastoral()" class="px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl flex items-center gap-2"><i data-lucide="plus" class="w-5 h-5"></i>Nuevo ingreso</button>'+
       '<div class="text-[11px] text-slate-400 flex items-center gap-1 text-right leading-tight"><i data-lucide="lock" class="w-3.5 h-3.5 flex-shrink-0"></i>Privado ·<br>aparte de tesorería</div></div>'+
-    '<div id="ipResumen" class="mb-2"></div>'+
-    '<div id="ipList" class="space-y-2"></div>';
+    '<div id="ipResumen" class="mb-3"></div>'+
+    '<div class="flex gap-1.5 p-1 bg-slate-100 rounded-xl mb-3">'+tab('mov','list','Movimientos')+tab('stats','bar-chart-3','Estadísticas')+tab('pers','users','Por miembro')+'</div>'+
+    '<div id="ipTab"></div>';
   ri(); await pintarPastoral();
 }
 async function pintarPastoral(){
+  // Encabezado con totales del mes/año (siempre visible)
   try{
     var res=await dbGet('v_stats_ingresos_pastorales','select=*&order=orden');
-    var d=await dbGet('ingresos_pastorales','select=*,members(nombre,nombre_display)&order=fecha.desc,created_at.desc&limit=200');
     var totMes=res.reduce(function(a,b){return a+Number(b.total_mes);},0);
     var totAnio=res.reduce(function(a,b){return a+Number(b.total_anio);},0);
     var mesNombre=new Date().toLocaleDateString('es-HN',{month:'long'});
@@ -2315,20 +2318,150 @@ async function pintarPastoral(){
         '<div class="text-3xl font-bold mt-1">'+dinero(totMes)+'</div>'+
         '<div class="text-sm opacity-80 mt-0.5">Acumulado del año: '+dinero(totAnio)+'</div></div>'+
       '<div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">'+chips+'</div>';
-    var lc=document.getElementById('ipList');
-    if(!d.length){ lc.innerHTML='<div class="mt-5">'+vacio('hand-coins','Aún no hay ingresos registrados. Toca \u201cNuevo ingreso\u201d para empezar.')+'</div>'; ri(); return; }
-    var borrable=puede(['admin','pastor']);
-    lc.innerHTML='<h4 class="text-sm font-semibold text-slate-500 mt-5 mb-2">Movimientos recientes</h4>'+d.map(function(x){ var t=IP_TIPOS[x.tipo]||IP_TIPOS.otro;
-      var quien=x.members?nomShow(x.members):(x.nombre_externo||'');
-      return '<div class="bg-white border border-slate-200 rounded-xl p-3 flex items-center gap-3">'+
-        '<div class="w-10 h-10 rounded-xl bg-'+t[2]+'-100 text-'+t[2]+'-700 flex items-center justify-center flex-shrink-0"><i data-lucide="'+t[1]+'" class="w-5 h-5"></i></div>'+
-        '<div class="flex-1 min-w-0"><div class="font-semibold text-slate-800">'+dinero(x.monto)+' <span class="text-xs font-normal text-slate-400">'+esc(t[0])+'</span></div>'+
-        '<div class="text-xs text-slate-500 truncate">'+fecha(x.fecha)+(quien?' · '+esc(quien):'')+(x.detalle?' · '+esc(x.detalle):'')+'</div></div>'+
-        '<div class="flex gap-1 flex-shrink-0"><button onclick="formIngresoPastoral(\''+x.id+'\')" class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400"><i data-lucide="pencil" class="w-4 h-4"></i></button>'+
-        (borrable?'<button onclick="borrarIngresoPastoral(\''+x.id+'\')" class="p-1.5 text-red-600 hover:bg-red-100 rounded-lg"><i data-lucide="trash-2" class="w-4 h-4"></i></button>':'')+'</div></div>';
+  }catch(e){}
+  await pintarPastoralTab();
+}
+async function pintarPastoralTab(){
+  var c=document.getElementById('ipTab'); if(!c) return; c.innerHTML=spin(); ri();
+  try{
+    if(IPF.tab==='stats'){ await pintarIPStats(c); }
+    else if(IPF.tab==='pers'){ await pintarIPPersonas(c); }
+    else { await pintarIPMovimientos(c); }
+  }catch(e){ c.innerHTML='<div class="text-sm text-red-600 p-3">'+esc(e.message.slice(0,150))+'</div>'; }
+}
+// Helpers de semana/mes ISO
+function ipSemanaKey(f){ var d=new Date(f+'T00:00:00'); var day=(d.getDay()+6)%7; d.setDate(d.getDate()-day); return d.getFullYear()+'-'+ri2(d.getMonth()+1)+'-'+ri2(d.getDate()); }
+function ipSemanaLabel(k){ var d=new Date(k+'T00:00:00'); var f=new Date(d); f.setDate(f.getDate()+6);
+  return 'Semana '+d.getDate()+' '+MES_L[d.getMonth()+1].slice(0,3)+' – '+f.getDate()+' '+MES_L[f.getMonth()+1].slice(0,3); }
+async function ipCargarMovimientos(){
+  var q='select=*,members(nombre,nombre_display)&order=fecha.desc,created_at.desc&limit=1000';
+  var d=await dbGet('ingresos_pastorales',q);
+  // Filtros en cliente
+  return d.filter(function(x){
+    if(IPF.tipo && x.tipo!==IPF.tipo) return false;
+    if(IPF.miembro && x.member_id!==IPF.miembro) return false;
+    if(IPF.mes){ var m=(x.fecha||'').slice(0,7); if(m!==IPF.mes) return false; }
+    if(IPF.desde && x.fecha<IPF.desde) return false;
+    if(IPF.hasta && x.fecha>IPF.hasta) return false;
+    if(IPF.montoMin!=='' && Number(x.monto)<Number(IPF.montoMin)) return false;
+    if(IPF.montoMax!=='' && Number(x.monto)>Number(IPF.montoMax)) return false;
+    return true;
+  });
+}
+async function pintarIPMovimientos(cont){
+  var mem=(S.cache.members&&S.cache.members.length)?S.cache.members:await dbGet('members','select=id,nombre,nombre_display&order=nombre');
+  var d=await ipCargarMovimientos();
+  // Ordenamiento
+  d.sort(function(a,b){
+    if(IPF.orden==='fecha_asc') return (a.fecha<b.fecha?-1:a.fecha>b.fecha?1:0);
+    if(IPF.orden==='monto_desc') return Number(b.monto)-Number(a.monto);
+    if(IPF.orden==='monto_asc') return Number(a.monto)-Number(b.monto);
+    return (a.fecha>b.fecha?-1:a.fecha<b.fecha?1:0); // fecha_desc
+  });
+  // Barra de filtros
+  var mesesOpts='<option value="">Todos los meses</option>';
+  var ahora=new Date();
+  for(var i=0;i<18;i++){ var dd=new Date(ahora.getFullYear(),ahora.getMonth()-i,1); var k=dd.getFullYear()+'-'+ri2(dd.getMonth()+1);
+    mesesOpts+='<option value="'+k+'"'+(IPF.mes===k?' selected':'')+'>'+MES_L[dd.getMonth()+1]+' '+dd.getFullYear()+'</option>'; }
+  var tiposOpts='<option value="">Todos los tipos</option>'+Object.keys(IP_TIPOS).map(function(k){ return '<option value="'+k+'"'+(IPF.tipo===k?' selected':'')+'>'+IP_TIPOS[k][0]+'</option>'; }).join('');
+  var memOpts='<option value="">Todos los miembros</option>'+mem.map(function(m){ return '<option value="'+m.id+'"'+(IPF.miembro===m.id?' selected':'')+'>'+esc(nomShow(m))+'</option>'; }).join('');
+  var ordOpts=[['fecha_desc','Fecha ↓'],['fecha_asc','Fecha ↑'],['monto_desc','Monto ↓'],['monto_asc','Monto ↑']].map(function(o){ return '<option value="'+o[0]+'"'+(IPF.orden===o[0]?' selected':'')+'>'+o[1]+'</option>'; }).join('');
+  var agrOpts=[['anio','Año'],['mes','Mes'],['semana','Semana'],['none','Sin agrupar']].map(function(o){ return '<option value="'+o[0]+'"'+(IPF.agrupar===o[0]?' selected':'')+'>'+o[1]+'</option>'; }).join('');
+  var hayFiltro=IPF.mes||IPF.desde||IPF.hasta||IPF.tipo||IPF.miembro||IPF.montoMin!==''||IPF.montoMax!=='';
+  var filtros='<div class="bg-white rounded-2xl border border-slate-200 p-3 mb-3 space-y-2">'+
+    '<div class="grid grid-cols-2 gap-2">'+
+      '<select onchange="IPF.mes=this.value;IPF.desde=\'\';IPF.hasta=\'\';pintarPastoralTab()" class="px-2 py-2 border border-slate-300 rounded-lg text-sm">'+mesesOpts+'</select>'+
+      '<select onchange="IPF.tipo=this.value;pintarPastoralTab()" class="px-2 py-2 border border-slate-300 rounded-lg text-sm">'+tiposOpts+'</select>'+
+    '</div>'+
+    '<div class="grid grid-cols-2 gap-2"><div><label class="text-[11px] text-slate-400">Desde</label><input type="date" value="'+IPF.desde+'" onchange="IPF.desde=this.value;IPF.mes=\'\';pintarPastoralTab()" class="w-full px-2 py-2 border border-slate-300 rounded-lg text-sm"></div>'+
+      '<div><label class="text-[11px] text-slate-400">Hasta</label><input type="date" value="'+IPF.hasta+'" onchange="IPF.hasta=this.value;IPF.mes=\'\';pintarPastoralTab()" class="w-full px-2 py-2 border border-slate-300 rounded-lg text-sm"></div></div>'+
+    '<select onchange="IPF.miembro=this.value;pintarPastoralTab()" class="w-full px-2 py-2 border border-slate-300 rounded-lg text-sm">'+memOpts+'</select>'+
+    '<div class="grid grid-cols-2 gap-2"><input type="number" placeholder="Monto mín" value="'+IPF.montoMin+'" onchange="IPF.montoMin=this.value;pintarPastoralTab()" class="px-2 py-2 border border-slate-300 rounded-lg text-sm">'+
+      '<input type="number" placeholder="Monto máx" value="'+IPF.montoMax+'" onchange="IPF.montoMax=this.value;pintarPastoralTab()" class="px-2 py-2 border border-slate-300 rounded-lg text-sm"></div>'+
+    '<div class="grid grid-cols-2 gap-2"><div><label class="text-[11px] text-slate-400">Ordenar</label><select onchange="IPF.orden=this.value;pintarPastoralTab()" class="w-full px-2 py-2 border border-slate-300 rounded-lg text-sm">'+ordOpts+'</select></div>'+
+      '<div><label class="text-[11px] text-slate-400">Agrupar por</label><select onchange="IPF.agrupar=this.value;pintarPastoralTab()" class="w-full px-2 py-2 border border-slate-300 rounded-lg text-sm">'+agrOpts+'</select></div></div>'+
+    (hayFiltro?'<button onclick="IPF.mes=\'\';IPF.desde=\'\';IPF.hasta=\'\';IPF.tipo=\'\';IPF.miembro=\'\';IPF.montoMin=\'\';IPF.montoMax=\'\';pintarPastoralTab()" class="w-full py-1.5 text-xs text-slate-500 bg-slate-50 rounded-lg">Limpiar filtros</button>':'')+
+    '</div>';
+  if(!d.length){ cont.innerHTML=filtros+'<div class="mt-4">'+vacio('hand-coins','No hay ingresos con estos filtros.')+'</div>'; ri(); return; }
+  var totFiltrado=d.reduce(function(a,b){return a+Number(b.monto);},0);
+  // Agrupación
+  var html=filtros+'<div class="flex items-center justify-between px-1 mb-2"><span class="text-sm font-semibold text-slate-600">'+d.length+' registro(s)</span><span class="text-sm font-bold text-indigo-700">'+dinero(totFiltrado)+'</span></div>';
+  var borrable=puede(['admin','pastor']);
+  var fila=function(x){ var t=IP_TIPOS[x.tipo]||IP_TIPOS.otro; var quien=x.members?nomShow(x.members):(x.nombre_externo||'');
+    return '<div class="bg-white border border-slate-200 rounded-xl p-3 flex items-center gap-3">'+
+      '<div class="w-10 h-10 rounded-xl bg-'+t[2]+'-100 text-'+t[2]+'-700 flex items-center justify-center flex-shrink-0"><i data-lucide="'+t[1]+'" class="w-5 h-5"></i></div>'+
+      '<div class="flex-1 min-w-0"><div class="font-semibold text-slate-800">'+dinero(x.monto)+' <span class="text-xs font-normal text-slate-400">'+esc(t[0])+'</span></div>'+
+      '<div class="text-xs text-slate-500 truncate">'+fecha(x.fecha)+(quien?' · '+esc(quien):'')+(x.detalle?' · '+esc(x.detalle):'')+'</div></div>'+
+      '<div class="flex gap-1 flex-shrink-0"><button onclick="formIngresoPastoral(\''+x.id+'\')" class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400"><i data-lucide="pencil" class="w-4 h-4"></i></button>'+
+      (borrable?'<button onclick="borrarIngresoPastoral(\''+x.id+'\')" class="p-1.5 text-red-600 hover:bg-red-100 rounded-lg"><i data-lucide="trash-2" class="w-4 h-4"></i></button>':'')+'</div></div>'; };
+  if(IPF.agrupar==='none'){
+    html+='<div class="space-y-2">'+d.map(fila).join('')+'</div>';
+  } else {
+    // Agrupar preservando el orden actual de d
+    var grupos=[], idx={};
+    d.forEach(function(x){
+      var key,lab;
+      if(IPF.agrupar==='anio'){ key=(x.fecha||'').slice(0,4); lab='Año '+key; }
+      else if(IPF.agrupar==='semana'){ key=ipSemanaKey(x.fecha); lab=ipSemanaLabel(key); }
+      else { key=(x.fecha||'').slice(0,7); var mm=key.split('-'); lab=MES_L[parseInt(mm[1],10)]+' '+mm[0]; }
+      if(idx[key]===undefined){ idx[key]=grupos.length; grupos.push({key:key,lab:lab,items:[],total:0}); }
+      var g=grupos[idx[key]]; g.items.push(x); g.total+=Number(x.monto);
+    });
+    // Acumulado cronológico: ordenar grupos por key asc para el running, pero mostrar en orden actual
+    var ordenadosAsc=grupos.slice().sort(function(a,b){return a.key<b.key?-1:a.key>b.key?1:0;});
+    var acc=0; var accMap={}; ordenadosAsc.forEach(function(g){ acc+=g.total; accMap[g.key]=acc; });
+    html+=grupos.map(function(g){
+      return '<div class="mb-3"><div class="flex items-center justify-between px-1 mb-1.5">'+
+        '<span class="text-sm font-bold text-slate-700">'+esc(g.lab)+'</span>'+
+        '<div class="text-right"><div class="text-sm font-bold text-slate-800">'+dinero(g.total)+'</div>'+
+        '<div class="text-[10px] text-slate-400">acum. '+dinero(accMap[g.key])+'</div></div></div>'+
+        '<div class="space-y-2">'+g.items.map(fila).join('')+'</div></div>';
     }).join('');
-    ri();
-  }catch(e){ document.getElementById('ipList').innerHTML='<div class="text-sm text-red-600 p-3">'+esc(e.message.slice(0,150))+'</div>'; }
+  }
+  cont.innerHTML=html; ri();
+}
+async function pintarIPStats(cont){
+  var prom=await rpcJson('ip_promedios',{p_dias:60}).catch(function(){return [];});
+  var grupos=await rpcJson('ip_grupos',{p_dias:60}).catch(function(){return [];});
+  var html='<div class="text-xs text-slate-400 mb-2 flex items-center gap-1"><i data-lucide="calendar" class="w-3.5 h-3.5"></i>Promedios de los últimos 60 días</div>';
+  html+='<div class="grid grid-cols-2 gap-2.5 mb-4">'+Object.keys(IP_TIPOS).map(function(k){
+    var t=IP_TIPOS[k]; var r=prom.filter(function(x){return x.tipo===k;})[0];
+    var promedio=r?Number(r.promedio):0, total=r?Number(r.total):0, n=r?Number(r.n_registros):0, np=r?Number(r.n_personas):0;
+    return '<div class="bg-white rounded-2xl border border-slate-200 p-4">'+
+      '<div class="flex items-center gap-2 mb-2"><div class="w-9 h-9 rounded-lg bg-'+t[2]+'-100 text-'+t[2]+'-700 flex items-center justify-center"><i data-lucide="'+t[1]+'" class="w-4 h-4"></i></div><span class="text-sm font-semibold text-slate-700">'+esc(t[0])+'</span></div>'+
+      '<div class="text-xl font-bold text-slate-800">'+dinero(promedio)+'</div><div class="text-[11px] text-slate-400">promedio por registro</div>'+
+      '<div class="mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-500 space-y-0.5"><div>Total 60d: <b class="text-slate-700">'+dinero(total)+'</b></div><div>'+n+' registros · '+np+' personas</div></div></div>';
+  }).join('')+'</div>';
+  var aportan=Number((grupos.filter(function(g){return g.grupo==='Aportan';})[0]||{n:0}).n);
+  var noAportan=Number((grupos.filter(function(g){return g.grupo==='No aportan';})[0]||{n:0}).n);
+  var totMiembros=aportan+noAportan;
+  var pctAp=totMiembros?Math.round(aportan/totMiembros*100):0;
+  html+='<div class="bg-white rounded-2xl border border-slate-200 p-4 mb-3">'+
+    '<h4 class="text-sm font-bold text-slate-700 mb-1">Miembros activos que aportan</h4>'+
+    '<div class="text-[11px] text-slate-400 mb-3">Diezmo o primicia en los últimos 60 días</div>'+
+    '<div class="flex items-end justify-between mb-2"><div><div class="text-3xl font-bold text-emerald-600">'+aportan+'</div><div class="text-xs text-slate-500">aportan ('+pctAp+'%)</div></div>'+
+      '<div class="text-right"><div class="text-3xl font-bold text-slate-300">'+noAportan+'</div><div class="text-xs text-slate-400">no aportan ('+(100-pctAp)+'%)</div></div></div>'+
+    '<div class="h-3 bg-slate-100 rounded-full overflow-hidden flex"><div class="h-full bg-emerald-500" style="width:'+pctAp+'%"></div></div>'+
+    '<div class="text-[11px] text-slate-400 mt-2 text-center">'+totMiembros+' miembros activos en total</div></div>';
+  cont.innerHTML=html; ri();
+}
+async function pintarIPPersonas(cont){
+  var d=await rpcJson('ip_por_persona',{p_dias:60}).catch(function(){return [];});
+  var html='<div class="text-xs text-slate-400 mb-2 flex items-center gap-1"><i data-lucide="calendar" class="w-3.5 h-3.5"></i>Actividad por persona · últimos 60 días</div>';
+  if(!d.length){ cont.innerHTML=html+'<div class="mt-3">'+vacio('users','Nadie ha aportado en los últimos 60 días.')+'</div>'; ri(); return; }
+  html+='<div class="space-y-2">'+d.map(function(p){
+    var nom=(p.nombre_display&&(''+p.nombre_display).trim())?p.nombre_display:(p.nombre||'—');
+    var freq = p.dias_entre_aportes!=null ? ('cada ~'+p.dias_entre_aportes+' días') : (Number(p.n_aportes)===1?'1 sola vez':'—');
+    return '<div class="bg-white border border-slate-200 rounded-xl p-3">'+
+      '<div class="flex items-center justify-between gap-2 mb-2"><div class="min-w-0"><div class="font-semibold text-slate-800 truncate">'+esc(nom)+(p.es_externo?' <span class="text-[10px] text-slate-400">(externo)</span>':'')+'</div>'+
+        '<div class="text-[11px] text-slate-400">'+freq+'</div></div>'+
+        '<div class="text-right flex-shrink-0"><div class="font-bold text-slate-800">'+dinero(p.total)+'</div><div class="text-[10px] text-slate-400">total 60d</div></div></div>'+
+      '<div class="grid grid-cols-3 gap-1 text-center text-xs pt-2 border-t border-slate-100">'+
+        '<div><div class="text-slate-400">Aportes</div><div class="font-semibold text-slate-700">'+p.n_aportes+'</div></div>'+
+        '<div><div class="text-slate-400">Promedio</div><div class="font-semibold text-slate-700">'+dinero(p.promedio_monto)+'</div></div>'+
+        '<div><div class="text-slate-400">Último</div><div class="font-semibold text-slate-700">'+fecha(p.ultimo_aporte)+'</div></div></div></div>';
+  }).join('')+'</div>';
+  cont.innerHTML=html; ri();
 }
 async function formIngresoPastoral(id){
   var mem=(S.cache.members&&S.cache.members.length)?S.cache.members:await dbGet('members','select=id,nombre,nombre_display&order=nombre');
