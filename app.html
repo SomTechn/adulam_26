@@ -676,6 +676,12 @@ async function editarMiembro(id){
   formMiembro(d[0]);
 }
 
+function toggleNuevaFamilia(sel){
+  var inp=document.getElementById('famNuevaInput');
+  if(!inp) return;
+  if(sel.value==='__nueva__'){ inp.classList.remove('hidden'); inp.focus(); }
+  else { inp.classList.add('hidden'); inp.value=''; }
+}
 function formMiembro(m){
   m=m||{};
   var ta=(m.member_teams||[]).map(function(x){return x.team_id;});
@@ -701,8 +707,10 @@ function formMiembro(m){
      '<p class="text-[11px] text-slate-400 mt-1">Pulsa el botón estando en la casa del miembro, o pega coordenadas de Google Maps.</p>'+
    '</div>'+
    '<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">'+
-     '<div><label class="text-sm font-medium text-slate-700">Familia</label><select name="familia_id" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"><option value="">Sin asignar</option>'+
-       fams.map(function(f){return '<option value="'+f.id+'"'+(m.familia_id===f.id?' selected':'')+'>'+esc(f.nombre_familia)+'</option>';}).join('')+'</select></div>'+
+     '<div><label class="text-sm font-medium text-slate-700">Familia</label><select name="familia_id" onchange="toggleNuevaFamilia(this)" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"><option value="">Sin asignar</option>'+
+       fams.map(function(f){return '<option value="'+f.id+'"'+(m.familia_id===f.id?' selected':'')+'>'+esc(f.nombre_familia)+'</option>';}).join('')+
+       '<option value="__nueva__">➕ Crear familia nueva...</option></select>'+
+       '<input name="familia_nueva" id="famNuevaInput" placeholder="Nombre de la nueva familia (ej: Familia Pérez)" class="w-full mt-2 px-3 py-2.5 border border-indigo-300 rounded-lg hidden"></div>'+
      '<div><label class="text-sm font-medium text-slate-700">Género</label><select name="genero" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"><option value="">—</option>'+
        '<option value="M"'+(m.genero==='M'?' selected':'')+'>Masculino</option><option value="F"'+(m.genero==='F'?' selected':'')+'>Femenino</option></select></div>'+
    '</div>'+
@@ -743,8 +751,19 @@ function formMiembro(m){
     btn.disabled=true; btn.textContent='Guardando...';
     try{
       var fd=new FormData(e.target);
+      // Si eligió "crear familia nueva", crearla primero y usar su id
+      var famId=fd.get('familia_id')||null;
+      if(famId==='__nueva__'){
+        var famNom=(fd.get('familia_nueva')||'').trim();
+        if(!famNom){ btn.disabled=false; btn.textContent=(m.id?'Guardar cambios':'Registrar'); toast('Escribe el nombre de la familia nueva','warning'); return; }
+        try{
+          var nf=await dbPost('families',{ nombre_familia:famNom });
+          famId=(nf&&nf[0])?nf[0].id:null;
+          limpiarCache('families');
+        }catch(fe){ btn.disabled=false; btn.textContent=(m.id?'Guardar cambios':'Registrar'); toast('No se pudo crear la familia','error'); return; }
+      }
       var body={ nombre:fd.get('nombre'), nombre_display:(fd.get('nombre_display')||'').trim()||null, telefono:fd.get('telefono')||null, direccion:fd.get('direccion')||null, sector:(fd.get('sector')||'').trim()||null,
-        familia_id:fd.get('familia_id')||null,
+        familia_id:famId,
         etapa:fd.get('etapa')||'nuevo', situacion:fd.get('situacion')||'activo', es_lider:!!fd.get('es_lider'),
         genero:fd.get('genero')||null, fecha_bautismo:fd.get('fecha_bautismo')||null,
         fecha_ingreso:fd.get('fecha_ingreso')||null,
@@ -2559,14 +2578,18 @@ async function perfilActividad(id){
   var partHtml = parts.length ? parts.map(function(p){
     totAsig+=Number(p.asignados); totVend+=Number(p.vendidos); totPag+=Number(p.pagado);
     var quien=p.members?nomShow(p.members):(p.nombre_externo||'\u2014');
+    var cond=Number(p.condonado||0);
     var esperado = a.precio_unitario ? Number(p.vendidos)*Number(a.precio_unitario) : null;
-    var pend = esperado!=null ? esperado-Number(p.pagado) : null;
-    var pagOk = esperado!=null && Number(p.pagado) >= esperado-0.001;
+    var pend = esperado!=null ? esperado-Number(p.pagado)-cond : null;
+    var pagOk = esperado!=null && (Number(p.pagado)+cond) >= esperado-0.001;
     return '<div class="border border-slate-200 rounded-xl p-3">'+
       '<div class="flex items-center justify-between gap-2"><span class="font-medium text-slate-800 truncate">'+esc(quien)+'</span>'+
-        (esperado!=null?(pagOk?'<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-semibold flex-shrink-0">Pag\u00f3</span>':'<span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold flex-shrink-0">Debe '+dinero(pend)+'</span>'):'')+'</div>'+
+        (esperado!=null?(pagOk?'<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-semibold flex-shrink-0">'+(cond>0&&Number(p.pagado)<esperado-0.001?'Saldado':'Pag\u00f3')+'</span>':'<span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold flex-shrink-0">Debe '+dinero(pend)+'</span>'):'')+'</div>'+
       '<div class="grid grid-cols-3 gap-1 mt-2 text-center text-xs"><div><div class="text-slate-400">Asignados</div><div class="font-semibold text-slate-700">'+p.asignados+'</div></div><div><div class="text-slate-400">Vendidos</div><div class="font-semibold text-slate-700">'+p.vendidos+'</div></div><div><div class="text-slate-400">Pagado</div><div class="font-semibold text-slate-700">'+dinero(p.pagado)+'</div></div></div>'+
-      (gestion?'<div class="flex gap-1 mt-2"><button onclick="pagoParticipante(\''+p.id+'\',\''+id+'\')" class="flex-1 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-medium">Registrar pago</button><button onclick="formParticipante(\''+id+'\',\''+p.id+'\')" class="px-3 py-1.5 bg-slate-100 rounded-lg text-xs">Editar</button></div>':'')+
+      (cond>0?'<div class="text-[11px] text-indigo-600 mt-1 text-center">Rebaja aplicada: '+dinero(cond)+'</div>':'')+
+      (gestion?'<div class="flex flex-wrap gap-1 mt-2"><button onclick="pagoParticipante(\''+p.id+'\',\''+id+'\')" class="flex-1 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-medium">Registrar pago</button>'+
+        ((esperado!=null && pend>0.001)?'<button onclick="condonarParticipante(\''+p.id+'\',\''+id+'\','+pend+')" class="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-medium">Condonar</button>':'')+
+        '<button onclick="formParticipante(\''+id+'\',\''+p.id+'\')" class="px-3 py-1.5 bg-slate-100 rounded-lg text-xs">Editar</button></div>':'')+
     '</div>';
   }).join('') : '<p class="text-sm text-slate-400">Sin vendedores registrados.</p>';
   var totales = parts.length ? '<div class="flex justify-between text-xs text-slate-500 mt-2 px-1"><span>Totales:</span><span>'+totAsig+' asignados · '+totVend+' vendidos · '+dinero(totPag)+' pagado</span></div>' : '';
@@ -2636,6 +2659,18 @@ async function registrarGastoActividad(actId){
   }catch(e){ toast(e.message.slice(0,150),'error'); }
 }
 async function borrarParticipante(pid, actId){ if(!confirm('¿Quitar este vendedor?')) return; try{ await dbDel('actividad_participantes','id=eq.'+pid); toast('Quitado','success'); closeModal('mPart'); perfilActividad(actId); }catch(e){ toast(e.message.slice(0,120),'error'); } }
+async function condonarParticipante(pid, actId, pendiente){
+  var p=(await dbGet('actividad_participantes','id=eq.'+pid+'&select=*,members(nombre,nombre_display)'))[0]; if(!p) return;
+  var quien=p.members?nomShow(p.members):(p.nombre_externo||'vendedor');
+  var val=prompt('Condonar (perdonar) saldo de '+quien+'.\n\nDebe actualmente: '+dinero(pendiente)+'\n\n¿Cuánto quieres rebajar? (deja el monto completo para saldar del todo)', (pendiente!=null?(''+pendiente):''));
+  if(val===null) return;
+  var n=parseFloat(val); if(isNaN(n)||n<=0){ toast('Monto inválido','warning'); return; }
+  try{
+    // Sumamos a lo ya condonado. No mueve dinero: solo reduce la deuda esperada.
+    await dbPatch('actividad_participantes','id=eq.'+pid,{ condonado:Number(p.condonado||0)+n });
+    toast('Saldo condonado: '+dinero(n),'success'); perfilActividad(actId);
+  }catch(e){ toast(e.message.slice(0,140),'error'); }
+}
 
 /* ---------- ALERTAS ---------- */
 async function view_alertas(){
@@ -2672,7 +2707,7 @@ async function pintarAlertasFin(){
     items.push(['target','orange','Meta vencida','"'+esc(m.nombre)+'" pas\u00f3 su fecha l\u00edmite ('+fecha(m.fecha_meta)+') con '+dinero(m.asignado)+' de '+dinero(m.cotizacion)+'.']); }); }catch(e){}
   try{ (await dbGet('actividad_participantes','select=*,members(nombre,nombre_display),actividades(nombre,precio_unitario)')).forEach(function(pp){
     var pr=(pp.actividades&&pp.actividades.precio_unitario)?Number(pp.actividades.precio_unitario):0;
-    if(pr>0){ var deuda=Number(pp.vendidos)*pr-Number(pp.pagado); if(deuda>0.001){ var q=pp.members?nomShow(pp.members):(pp.nombre_externo||'Vendedor');
+    if(pr>0){ var deuda=Number(pp.vendidos)*pr-Number(pp.pagado)-Number(pp.condonado||0); if(deuda>0.001){ var q=pp.members?nomShow(pp.members):(pp.nombre_externo||'Vendedor');
       items.push(['user-x','amber','Pago pendiente',esc(q)+' debe '+dinero(deuda)+' de "'+esc(pp.actividades?pp.actividades.nombre:'actividad')+'".']); } } }); }catch(e){}
   var col={red:['bg-red-50','border-red-200','#dc2626'],orange:['bg-orange-50','border-orange-200','#ea580c'],amber:['bg-amber-50','border-amber-200','#d97706']};
   var html = items.length ? items.map(function(a){ var c=col[a[1]]||col.amber;
