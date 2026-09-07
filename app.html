@@ -103,7 +103,23 @@ input:not([type=checkbox]):not([type=radio]):not([type=file]),select,textarea{fo
     <header id="topbar" class="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-slate-200 px-4 lg:px-8 py-3 flex items-center gap-3">
       <button class="lg:hidden p-2 -ml-2 rounded-lg hover:bg-slate-100" onclick="openNav()"><i data-lucide="menu" class="w-6 h-6"></i></button>
       <h2 id="pageTitle" class="text-lg lg:text-xl font-bold text-slate-800 truncate flex-1"></h2>
+      <button onclick="abrirBusqueda()" class="p-2 rounded-lg hover:bg-slate-100 text-slate-500 flex-shrink-0" title="Búsqueda global"><i data-lucide="search" class="w-5 h-5"></i></button>
     </header>
+    <!-- Modal búsqueda global -->
+    <div id="mBusq" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onclick="if(event.target===this)cerrarBusqueda()">
+      <div class="bg-white w-full max-w-lg mx-auto mt-16 rounded-2xl shadow-2xl overflow-hidden">
+        <div class="flex items-center gap-3 p-4 border-b border-slate-200">
+          <i data-lucide="search" class="w-5 h-5 text-slate-400 flex-shrink-0"></i>
+          <input id="iBusq" type="search" placeholder="Buscar miembro, visitante, movimiento..." autocomplete="off"
+            class="flex-1 text-base outline-none bg-transparent placeholder-slate-400"
+            oninput="ejecutarBusqueda(this.value)">
+          <button onclick="cerrarBusqueda()" class="p-1 rounded-lg hover:bg-slate-100 text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+        <div id="rBusq" class="max-h-80 overflow-y-auto p-2">
+          <p class="text-sm text-slate-400 text-center py-6">Escribe para buscar...</p>
+        </div>
+      </div>
+    </div>
     <div id="page" class="flex-1 p-4 lg:p-6"></div>
   </main>
   <nav id="bottomnav" class="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex z-30 shadow-lg"></nav>
@@ -807,32 +823,90 @@ async function borrarMiembro(id,nombre){
   catch(e){ toast(e.message.slice(0,120),'error'); }
 }
 
-async function perfilMiembro(id){
+async function perfilMiembro(id, _tab){
+  var tab=_tab||'datos';
   try{
     var d=(await dbGet('members','id=eq.'+id+'&select=*,families(nombre_familia),member_teams(teams(nombre)),member_houses(houses(nombre))'))[0];
+    if(!d){ toast('Miembro no encontrado','error'); return; }
     var er=edadRango(d.fecha_nacimiento);
-    var att=await dbGet('attendance','member_id=eq.'+id+'&select=*&order=fecha.desc&limit=10');
+    var ant=antiguedad(d.fecha_ingreso);
     var mins=(d.member_teams||[]).map(function(t){return t.teams?t.teams.nombre:null;}).filter(Boolean);
     var cas=(d.member_houses||[]).map(function(h){return h.houses?h.houses.nombre:null;}).filter(Boolean);
-    var asis = att.length ? att.map(function(a){
-      return '<div class="flex justify-between text-sm py-2 border-b border-slate-100 last:border-0"><span>'+fecha(a.fecha)+' · '+esc(a.tipo_reunion)+'</span><span>'+(a.asistio?'<i data-lucide="check" class="w-4 h-4 text-emerald-600 inline"></i>':'<i data-lucide="x" class="w-4 h-4 text-red-500 inline"></i>')+'</span></div>';
-    }).join('') : '<p class="text-slate-400 text-sm">Sin registros</p>';
-    modalFull('mP', mHead('Perfil del miembro','mP')+'<div class="p-4 max-w-2xl mx-auto pb-8">'+
-      '<div class="flex items-center gap-4 mb-4"><div class="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-2xl font-bold overflow-hidden">'+
+    var esPastorAdmin=puede(['admin','pastor']);
+
+    // Cabecera siempre visible
+    var cabeza='<div class="flex items-center gap-4 mb-4">'+
+      '<div class="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-2xl font-bold overflow-hidden flex-shrink-0">'+
       (d.foto_url?'<img src="'+esc(d.foto_url)+'" class="w-full h-full object-cover">':esc((nomShow(d)||'?')[0].toUpperCase()))+'</div>'+
       '<div class="min-w-0"><h3 class="text-xl font-bold truncate">'+esc(nomShow(d))+'</h3>'+
-      ((d.nombre_display&&(''+d.nombre_display).trim()&&d.nombre_display!==d.nombre)?'<p class="text-slate-400 text-xs truncate">'+esc(d.nombre)+'</p>':'')+
-      '<p class="text-slate-500 text-sm capitalize">'+esc(d.estado_espiritual)+'</p>'+(er.edad!=null?'<span class="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-'+er.color+'-100 text-'+er.color+'-700">'+er.edad+' años · '+er.rango+'</span>':'')+
-      (d.telefono?'<p class="text-sm mt-1">'+esc(d.telefono)+'</p>':'')+'</div></div>'+
-      '<div class="space-y-2 text-sm bg-slate-50 rounded-xl p-3">'+
-      (d.direccion?'<div><b>Dirección:</b> '+esc(d.direccion)+'</div>':'')+
-      (d.families?'<div><b>Familia:</b> '+esc(d.families.nombre_familia)+'</div>':'')+(d.fecha_nacimiento?'<div><b>Nacimiento:</b> '+fecha(d.fecha_nacimiento)+(er.edad!=null?' · '+er.edad+' años ('+er.rango+')':'')+'</div>':'')+(d.sector?'<div><b>Sector:</b> '+esc(d.sector)+'</div>':'')+
-      (d.fecha_ingreso?(function(){var a=antiguedad(d.fecha_ingreso);return '<div><b>En la iglesia desde:</b> '+fecha(d.fecha_ingreso)+(a.texto?' · <span class="text-'+a.color+'-700 font-medium">'+a.texto+'</span> ('+a.rango+')':'')+'</div>';})():'')+
-      (mins.length?'<div><b>Ministerios:</b> '+esc(mins.join(', '))+'</div>':'')+
-      (cas.length?'<div><b>Casas de Pan:</b> '+esc(cas.join(', '))+'</div>':'')+
-      (d.notas?'<div><b>Notas:</b> '+esc(d.notas)+'</div>':'')+'</div>'+
-      '<div class="mt-4"><h4 class="font-semibold mb-2">Últimas asistencias</h4><div class="bg-white border border-slate-200 rounded-xl p-3">'+asis+'</div></div>'+
-      '<button onclick="closeModal(\'mP\')" class="mt-4 w-full py-3 bg-slate-100 rounded-xl font-medium">Cerrar</button></div>');
+      ((d.nombre_display&&d.nombre_display!==d.nombre)?'<p class="text-slate-400 text-xs truncate">'+esc(d.nombre)+'</p>':'')+
+      '<p class="text-slate-500 text-sm capitalize">'+esc(d.estado_espiritual||'')+'</p>'+
+      (er.edad!=null?'<span class="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-'+er.color+'-100 text-'+er.color+'-700">'+er.edad+' años · '+er.rango+'</span>':'')+
+      (d.telefono?'<p class="text-sm mt-1 text-slate-600">'+esc(d.telefono)+'</p>':'')+'</div></div>';
+
+    // Tabs
+    var tabs=function(t){ return '<div class="flex gap-1 p-1 bg-slate-100 rounded-xl mb-4">'+
+      ['datos','asistencia','finanzas'].map(function(k){
+        var lab={datos:'Datos',asistencia:'Asistencia',finanzas:'Finanzas'}[k];
+        if(k==='finanzas'&&!esPastorAdmin) return '';
+        return '<button onclick="perfilMiembro(\''+id+'\',\''+k+'\')" class="flex-1 py-2 rounded-lg text-sm font-semibold '+(t===k?'bg-white shadow text-indigo-700':'text-slate-500')+'">'+lab+'</button>';
+      }).join('')+'</div>'; };
+
+    var cuerpo='';
+
+    if(tab==='datos'){
+      cuerpo='<div class="space-y-2 text-sm bg-slate-50 rounded-xl p-3 mb-4">'+
+        (d.direccion?'<div><b>Dirección:</b> '+esc(d.direccion)+'</div>':'')+
+        (d.families?'<div><b>Familia:</b> '+esc(d.families.nombre_familia)+'</div>':'')+
+        (d.sector?'<div><b>Sector:</b> '+esc(d.sector)+'</div>':'')+
+        (d.fecha_nacimiento?'<div><b>Nacimiento:</b> '+fecha(d.fecha_nacimiento)+(er.edad!=null?' · '+er.edad+' años':'')+'</div>':'')+
+        (d.fecha_bautismo?'<div><b>Bautismo:</b> '+fecha(d.fecha_bautismo)+'</div>':'')+
+        (d.fecha_ingreso?'<div><b>En la iglesia desde:</b> '+fecha(d.fecha_ingreso)+(ant.texto?' · <span class="text-'+ant.color+'-700 font-medium">'+ant.texto+'</span>':'')+'</div>':'')+
+        (mins.length?'<div><b>Ministerios:</b> '+esc(mins.join(', '))+'</div>':'')+
+        (cas.length?'<div><b>Casas de Pan:</b> '+esc(cas.join(', '))+'</div>':'')+
+        (d.notas?'<div><b>Notas:</b> '+esc(d.notas)+'</div>':'')+'</div>'+
+        '<div class="flex gap-2"><button onclick="closeModal(\'mP\');formMiembro('+JSON.stringify(d)+')" class="flex-1 py-3 bg-indigo-50 text-indigo-700 rounded-xl font-medium flex items-center justify-center gap-2"><i data-lucide="pencil" class="w-4 h-4"></i>Editar</button>'+
+        '<button onclick="closeModal(\'mP\')" class="flex-1 py-3 bg-slate-100 rounded-xl font-medium">Cerrar</button></div>';
+    }
+
+    if(tab==='asistencia'){
+      var att=await rpcJson('member_asistencia',{p_member_id:id,p_limit:10}).catch(function(){return [];});
+      var pct=await rpcJson('member_asistencia_pct',{p_member_id:id,p_dias:60}).catch(function(){return null;});
+      cuerpo='<div class="bg-white border border-slate-200 rounded-xl p-4 mb-3">'+
+        '<div class="grid grid-cols-2 gap-3 text-center">'+
+        '<div><div class="text-2xl font-bold '+(pct!=null?'text-indigo-600':'text-slate-400')+'">'+(pct!=null?pct+'%':'—')+'</div><div class="text-xs text-slate-500">% asistencia 60d</div></div>'+
+        '<div><div class="text-2xl font-bold text-slate-700">'+att.length+'</div><div class="text-xs text-slate-500">últimas registradas</div></div></div></div>'+
+        '<div class="space-y-1.5">'+
+        (att.length?att.map(function(a){
+          return '<div class="bg-white border border-slate-200 rounded-xl px-3 py-2.5 flex items-center justify-between">'+
+            '<div><div class="text-sm font-medium text-slate-700">'+esc(a.meeting_nombre)+'</div>'+
+            '<div class="text-xs text-slate-400">'+fecha(a.fecha)+'</div></div>'+
+            (a.asistio?'<span class="text-xs font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">Asistió</span>':
+                       '<span class="text-xs font-semibold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">Ausente</span>')+'</div>';
+        }).join('') : '<p class="text-sm text-slate-400 text-center py-6">Sin asistencias registradas.</p>')+
+        '</div><button onclick="closeModal(\'mP\')" class="mt-4 w-full py-3 bg-slate-100 rounded-xl font-medium">Cerrar</button>';
+    }
+
+    if(tab==='finanzas' && esPastorAdmin){
+      var ips=await rpcJson('member_ingresos_pastorales',{p_member_id:id}).catch(function(){return [];});
+      var totIP=ips.reduce(function(a,b){return a+Number(b.monto);},0);
+      cuerpo='<div class="bg-white border border-slate-200 rounded-xl p-4 mb-3">'+
+        '<div class="grid grid-cols-2 gap-3 text-center">'+
+        '<div><div class="text-2xl font-bold text-indigo-600">'+dinero(totIP)+'</div><div class="text-xs text-slate-500">total diezmos/primicias</div></div>'+
+        '<div><div class="text-2xl font-bold text-slate-700">'+ips.length+'</div><div class="text-xs text-slate-500">registros</div></div></div></div>'+
+        '<div class="space-y-1.5">'+
+        (ips.length?ips.map(function(x){ var t=IP_TIPOS[x.tipo]||IP_TIPOS.otro;
+          return '<div class="bg-white border border-slate-200 rounded-xl px-3 py-2.5 flex items-center gap-3">'+
+            '<div class="w-8 h-8 rounded-lg bg-'+t[2]+'-100 text-'+t[2]+'-700 flex items-center justify-center flex-shrink-0"><i data-lucide="'+t[1]+'" class="w-4 h-4"></i></div>'+
+            '<div class="flex-1 min-w-0"><div class="text-sm font-medium text-slate-700">'+dinero(x.monto)+' <span class="text-xs text-slate-400">'+esc(t[0])+'</span></div>'+
+            (x.detalle?'<div class="text-xs text-slate-400 truncate">'+esc(x.detalle)+'</div>':'')+
+            '</div><div class="text-xs text-slate-400 flex-shrink-0">'+fecha(x.fecha)+'</div></div>';
+        }).join('') : '<p class="text-sm text-slate-400 text-center py-6">Sin registros de diezmos o primicias.</p>')+
+        '</div><button onclick="closeModal(\'mP\')" class="mt-4 w-full py-3 bg-slate-100 rounded-xl font-medium">Cerrar</button>';
+    }
+
+    modalFull('mP', mHead('Perfil del miembro','mP')+
+      '<div class="p-4 max-w-2xl mx-auto pb-8">'+cabeza+tabs(tab)+cuerpo+'</div>');
   }catch(e){ toast(e.message.slice(0,120),'error'); }
 }
 
@@ -1024,8 +1098,10 @@ async function view_attendance(){
      '<div class="flex gap-2 mb-4 flex-wrap">'+
        '<button onclick="marcarTodos(true)" class="px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 rounded-lg text-sm font-medium flex items-center gap-1.5"><i data-lucide="check" class="w-4 h-4"></i>Marcar todos</button>'+
        '<button onclick="marcarTodos(false)" class="px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-sm font-medium flex items-center gap-1.5"><i data-lucide="x" class="w-4 h-4"></i>Desmarcar</button>'+
+       '<button onclick="exportarAsistencia()" class="ml-auto px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-sm font-medium flex items-center gap-1.5"><i data-lucide="download" class="w-4 h-4"></i>Exportar</button>'+
      '</div>'+
      '<div id="aLista" class="space-y-2"></div>'+
+     '<div id="aVisitantes" class="mt-6"></div>'+
    '</div>';
   ri();
 
@@ -1035,6 +1111,7 @@ async function view_attendance(){
   casas.forEach(function(c){ document.getElementById('aCasa').innerHTML+='<option value="'+c.id+'">'+esc(c.nombre)+'</option>'; });
 
   A.miembros = await dbGet('members','select=id,nombre,nombre_display,foto_url,familia_id,families(nombre_familia),member_houses(house_id)&estado_espiritual=neq.inactivo&order=nombre');
+  A.visitantes = await dbGet('visitors','estado=eq.nuevo&select=id,nombre,telefono,fecha_visita&order=nombre').catch(function(){return [];});
 
   document.getElementById('aFecha').onchange=cargarServiciosDia;
   document.getElementById('aBuscar').oninput=pintarAsistencia;
@@ -1094,6 +1171,9 @@ async function elegirServicio(id){
   pintarSelectorServicios();   // solo actualiza el resaltado, no vuelve a cargar
   var att=await dbGet('attendance','fecha=eq.'+A.servicio.fecha+'&meeting_type_id=eq.'+A.servicio.meeting_type_id+'&select=*');
   A.mapa={}; att.forEach(function(a){ A.mapa[a.member_id]=a; });
+  // Mapa de asistencia de visitantes
+  var vatt=await dbGet('visitor_attendance','fecha=eq.'+A.servicio.fecha+'&meeting_type_id=eq.'+A.servicio.meeting_type_id+'&select=*').catch(function(){return [];});
+  A.mapaVis={}; vatt.forEach(function(a){ A.mapaVis[a.visitor_id]=a; });
   var pn=document.getElementById('aPanel'); if(pn) pn.classList.remove('hidden');
   pintarAsistencia();
 }
@@ -1135,7 +1215,93 @@ function pintarAsistencia(){
         (m.families?'<div class="text-xs text-slate-500 truncate">'+esc(m.families.nombre_familia)+'</div>':'')+'</div>'+
         '<input type="checkbox" '+(ok?'checked':'')+' onchange="marcarUno(\''+m.id+'\',this.checked)" class="w-6 h-6 accent-emerald-600 flex-shrink-0"></label>';
     }).join('');
+  pintarVisitantesAsist();
   ri();
+}
+function pintarVisitantesAsist(){
+  var c=document.getElementById('aVisitantes'); if(!c) return;
+  var vis=A.visitantes||[];
+  if(!vis.length){ c.innerHTML=''; return; }
+  var presV=0; for(var k in A.mapaVis){ if(A.mapaVis[k].asistio) presV++; }
+  c.innerHTML='<div class="flex items-center justify-between mb-2">'+
+      '<h4 class="text-sm font-bold text-slate-700 flex items-center gap-1.5"><i data-lucide="user-plus" class="w-4 h-4 text-amber-500"></i>Visitantes en seguimiento</h4>'+
+      '<span class="text-xs text-slate-500">'+presV+' de '+vis.length+' presentes</span></div>'+
+    '<div class="space-y-2">'+vis.map(function(v){
+      var a=A.mapaVis[v.id], ok=a?a.asistio:false;
+      return '<label class="bg-white rounded-xl border p-3 flex items-center gap-3 cursor-pointer hover:bg-slate-50 transition '+(ok?'border-amber-300 bg-amber-50':'border-slate-200')+'">'+
+        '<div class="w-10 h-10 rounded-full bg-amber-400 flex items-center justify-center text-white font-bold flex-shrink-0">'+esc((v.nombre||'?')[0].toUpperCase())+'</div>'+
+        '<div class="flex-1 min-w-0"><div class="font-medium text-slate-800 truncate">'+esc(v.nombre)+' <span class="text-[10px] text-amber-600 font-normal">(visitante)</span></div>'+
+        (v.telefono?'<div class="text-xs text-slate-500 truncate">'+esc(v.telefono)+'</div>':'')+'</div>'+
+        '<input type="checkbox" '+(ok?'checked':'')+' onchange="marcarVisitante(\''+v.id+'\',this.checked)" class="w-6 h-6 accent-amber-600 flex-shrink-0"></label>';
+    }).join('')+'</div>'+
+    '<div class="flex gap-2 mt-2">'+
+      '<button onclick="marcarTodosVis(true)" class="flex-1 py-2 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-lg text-xs font-medium">Marcar todos</button>'+
+      '<button onclick="marcarTodosVis(false)" class="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-medium">Desmarcar</button></div>';
+  ri();
+}
+async function marcarVisitante(vid, ok){
+  if(!A.servicio) return;
+  var row={ visitor_id:vid, fecha:A.servicio.fecha, meeting_type_id:A.servicio.meeting_type_id, tipo_reunion:A.servicio.tipo_reunion, asistio:ok };
+  try{
+    await dbUpsert('visitor_attendance',[row],'visitor_id,fecha,tipo_reunion');
+    A.mapaVis[vid]=row; pintarVisitantesAsist();
+  }catch(e){ toast(e.message.slice(0,120),'error'); }
+}
+async function marcarTodosVis(ok){
+  if(!A.servicio) return;
+  var vis=A.visitantes||[];
+  if(!vis.length) return;
+  if(!confirm('¿'+(ok?'Marcar':'Desmarcar')+' asistencia de '+vis.length+' visitantes?')) return;
+  var rows=vis.map(function(v){ return { visitor_id:v.id, fecha:A.servicio.fecha, meeting_type_id:A.servicio.meeting_type_id, tipo_reunion:A.servicio.tipo_reunion, asistio:ok }; });
+  try{
+    await dbUpsert('visitor_attendance',rows,'visitor_id,fecha,tipo_reunion');
+    rows.forEach(function(r){ A.mapaVis[r.visitor_id]=r; });
+    toast(rows.length+' visitantes actualizados','success'); pintarVisitantesAsist();
+  }catch(e){ toast(e.message.slice(0,150),'error'); }
+}
+function exportarAsistencia(){
+  if(!A.servicio) return;
+  var mt=A.servicio.meeting_types;
+  var servNom=mt?mt.nombre:A.servicio.tipo_reunion;
+  var pres=0, aus=0;
+  var filas=A.miembros.map(function(m){
+    var ok=A.mapa[m.id]?A.mapa[m.id].asistio:false;
+    if(ok) pres++; else aus++;
+    return [nomShow(m), ok?'Presente':'Ausente'];
+  });
+  var presV=0;
+  var filasV=(A.visitantes||[]).map(function(v){
+    var ok=A.mapaVis[v.id]?A.mapaVis[v.id].asistio:false;
+    if(ok) presV++;
+    return [v.nombre+' (visitante)', ok?'Presente':'Ausente'];
+  });
+  var win=window.open('','_blank');
+  if(!win){ toast('Permite ventanas emergentes','warning'); return; }
+  win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Asistencia '+A.servicio.fecha+'</title>'+
+    '<style>*{font-family:Arial,sans-serif;color:#1e293b}body{max-width:680px;margin:0 auto;padding:30px}'+
+    'h1{font-size:18px;margin:0}h2{font-weight:normal;color:#64748b;font-size:13px;margin:4px 0 20px}'+
+    '.res{display:flex;gap:12px;margin-bottom:20px}.box{flex:1;text-align:center;padding:10px;border-radius:8px;background:#f8fafc;border:1px solid #e2e8f0}'+
+    '.box b{display:block;font-size:20px}.box span{font-size:11px;color:#64748b}'+
+    'table{width:100%;border-collapse:collapse}th{background:#f1f5f9;text-align:left;padding:8px;font-size:12px}'+
+    'td{padding:7px 8px;border-bottom:1px solid #f1f5f9;font-size:13px}.ok{color:#059669;font-weight:bold}.no{color:#dc2626}'+
+    '.vis{color:#d97706}.foot{font-size:11px;color:#94a3b8;margin-top:20px;text-align:center}'+
+    '@media print{body{padding:10px}}</style></head><body>'+
+    '<h1>Iglesia ADULAM — Registro de Asistencia</h1>'+
+    '<h2>'+esc(servNom)+' · '+fecha(A.servicio.fecha)+(A.servicio.tema?' · '+esc(A.servicio.tema):'')+'</h2>'+
+    '<div class="res">'+
+      '<div class="box"><b>'+A.miembros.length+'</b><span>Total miembros</span></div>'+
+      '<div class="box"><b style="color:#059669">'+pres+'</b><span>Presentes</span></div>'+
+      '<div class="box"><b style="color:#dc2626">'+aus+'</b><span>Ausentes</span></div>'+
+      '<div class="box"><b>'+(A.miembros.length?Math.round(pres/A.miembros.length*100):0)+'%</b><span>Asistencia</span></div>'+
+      ((A.visitantes||[]).length?'<div class="box"><b style="color:#d97706">'+presV+'</b><span>Visitantes</span></div>':'')+
+    '</div>'+
+    '<table><thead><tr><th>Nombre</th><th>Estado</th></tr></thead><tbody>'+
+    filas.map(function(f){ return '<tr><td>'+esc(f[0])+'</td><td class="'+(f[1]==='Presente'?'ok':'no')+'">'+f[1]+'</td></tr>'; }).join('')+
+    (filasV.length?filasV.map(function(f){ return '<tr><td class="vis">'+esc(f[0])+'</td><td class="'+(f[1]==='Presente'?'ok':'no')+'">'+f[1]+'</td></tr>'; }).join(''):'')+
+    '</tbody></table>'+
+    '<div class="foot">Exportado el '+new Date().toLocaleDateString('es-HN',{day:'numeric',month:'long',year:'numeric'})+' desde ADULAM</div>'+
+    '<script>window.onload=function(){setTimeout(function(){window.print();},300);}<\/script></body></html>');
+  win.document.close();
 }
 
 async function marcarUno(mid, ok){
@@ -1784,7 +1950,9 @@ async function convertirVisita(id){
       fecha_ingreso:v.fecha_visita, notas:'Llegó como visita el '+v.fecha_visita });
     await dbPatch('visitors','id=eq.'+id,{ estado:'integrado', member_id:nm[0].id });
     limpiarCache('members'); closeModal('mVd');
-    toast('Ahora es miembro. Completa sus datos en Membresía.','success'); pintarVisitas();
+    toast('Ahora es miembro. Puedes completar sus datos en el perfil.','success');
+    pintarVisitas();
+    setTimeout(function(){ perfilMiembro(nm[0].id); },400);
   }catch(e){ toast(e.message.slice(0,140),'error'); }
 }
 
@@ -3815,7 +3983,18 @@ async function datosInforme(){
   }
   var cajaNom='';
   if(caja){ var cs=await fzCajasVisibles(); var f=cs.filter(function(x){return x.id===caja;})[0]; cajaNom=f?f.nombre:''; }
-  return { desde:desde, hasta:hasta, categorias:categorias, porCaja:porCaja, cierre:cierre, caja:caja, cajaNom:cajaNom };
+  // Movimientos sin comprobante (para control)
+  var sinComp=[];
+  try{
+    var movs=await dbGet('treasury','fecha=gte.'+desde+'&fecha=lte.'+hasta+(caja?'&caja_id=eq.'+caja:'')+'&select=id,tipo,monto,descripcion,fecha,caja_id,n_comprobantes&order=fecha.asc&limit=500');
+    sinComp=movs.filter(function(m){ return !m.n_comprobantes||m.n_comprobantes===0; });
+  }catch(e){}
+  // Metas del período
+  var metas=[];
+  try{
+    metas=await dbGet('actividades','select=*&order=created_at.desc&limit=50');
+  }catch(e){}
+  return { desde:desde, hasta:hasta, categorias:categorias, porCaja:porCaja, cierre:cierre, caja:caja, cajaNom:cajaNom, sinComp:sinComp, metas:metas };
 }
 function htmlInforme(r){
   var ing=r.categorias.filter(function(c){return c.tipo==='ingreso';});
@@ -3852,6 +4031,19 @@ function htmlInforme(r){
           '<td class="py-2 text-right text-red-600">−'+dinero(c.egresos||0)+'</td>'+
           '<td class="py-2 text-right font-semibold">'+dinero(c.neto||0)+'</td></tr>';
       }).join('')+'</tbody></table>':'')+
+    (r.metas&&r.metas.length?'<h4 class="text-sm font-bold text-indigo-600 uppercase tracking-wide mb-1 mt-4">Metas / Actividades</h4>'+
+      '<table class="w-full text-sm"><tbody>'+r.metas.map(function(m){
+        var tot=Number(m.cotizacion||0)*Number(m.participantes_count||0);
+        return '<tr class="border-b border-slate-100"><td class="py-2">'+esc(m.nombre)+'</td>'+
+          '<td class="py-2 text-right text-slate-400 text-xs">meta '+dinero(m.cotizacion||0)+'</td>'+
+          '<td class="py-2 text-right font-medium text-indigo-700">'+dinero(m.recaudado||0)+'</td></tr>';
+      }).join('')+'</tbody></table>':'')+
+    (r.sinComp&&r.sinComp.length?'<h4 class="text-sm font-bold text-amber-600 uppercase tracking-wide mb-1 mt-4">Sin comprobante ('+r.sinComp.length+')</h4>'+
+      '<table class="w-full text-sm"><tbody>'+r.sinComp.slice(0,15).map(function(m){
+        return '<tr class="border-b border-slate-100"><td class="py-2">'+fecha(m.fecha)+'</td>'+
+          '<td class="py-2 text-slate-500 truncate max-w-[140px]">'+esc(m.descripcion||'sin descripción')+'</td>'+
+          '<td class="py-2 text-right '+(m.tipo==='ingreso'?'text-emerald-600':'text-red-600')+'">'+dinero(m.monto)+'</td></tr>';
+      }).join('')+(r.sinComp.length>15?'<tr><td colspan="3" class="py-2 text-xs text-slate-400 text-center">... y '+(r.sinComp.length-15)+' más</td></tr>':'')+'</tbody></table>':'')+
     '<p class="text-xs text-slate-400 mt-6 pt-4 border-t border-slate-200 text-center">Generado el '+new Date().toLocaleDateString('es-HN',{day:'numeric',month:'long',year:'numeric'})+' desde ADULAM</p>'+
     '</div>';
 }
@@ -3882,6 +4074,15 @@ async function descargarInforme(){
     '<div class="box res"><div class="l">Resultado</div><div class="v">'+dinero(totIng-totEgr)+'</div></div></div>'+
     '<h3>Ingresos</h3><table>'+(ing.length?ing.map(fila).join(''):'<tr><td>Sin ingresos</td><td class="n">'+dinero(0)+'</td></tr>')+'</table>'+
     '<h3>Egresos</h3><table>'+(egr.length?egr.map(fila).join(''):'<tr><td>Sin egresos</td><td class="n">'+dinero(0)+'</td></tr>')+'</table>'+
+    (r.porCaja&&r.porCaja.length?'<h3>Movimiento por caja</h3><table>'+r.porCaja.map(function(c){
+      return '<tr><td>'+esc(c.caja)+'</td><td class="n" style="color:#059669">+'+dinero(c.ingresos||0)+'</td><td class="n" style="color:#dc2626">−'+dinero(c.egresos||0)+'</td><td class="n">'+dinero(c.neto||0)+'</td></tr>';
+    }).join('')+'</table>':'')+
+    (r.metas&&r.metas.length?'<h3>Metas / Actividades</h3><table>'+r.metas.map(function(m){
+      return '<tr><td>'+esc(m.nombre)+'</td><td>Meta: '+dinero(m.cotizacion||0)+'</td><td class="n" style="color:#4f46e5">'+dinero(m.recaudado||0)+'</td></tr>';
+    }).join('')+'</table>':'')+
+    (r.sinComp&&r.sinComp.length?'<h3 style="color:#d97706">Sin comprobante ('+r.sinComp.length+')</h3><table>'+r.sinComp.slice(0,20).map(function(m){
+      return '<tr><td>'+fecha(m.fecha)+'</td><td>'+esc(m.descripcion||'sin descripción')+'</td><td class="n">'+dinero(m.monto)+'</td></tr>';
+    }).join('')+(r.sinComp.length>20?'<tr><td colspan="3" style="color:#94a3b8;font-size:11px">... y '+(r.sinComp.length-20)+' más sin comprobante</td></tr>':'')+'</table>':'')+
     '<div class="firma"><div>Tesorero</div><div>Fiscal</div><div>Pastor</div></div>'+
     '<div class="foot">Generado el '+new Date().toLocaleDateString('es-HN',{day:'numeric',month:'long',year:'numeric'})+' desde ADULAM · Sistema de Administración Pastoral</div>'+
     '<script>window.onload=function(){setTimeout(function(){window.print();},300);}<\/script></body></html>');
@@ -4625,6 +4826,54 @@ document.getElementById('formR').onsubmit=async function(e){
     setTimeout(function(){ toast('Sesión reiniciada: '+e.message.slice(0,60),'warning'); },400);
   }
 })();
+
+/* ---- Búsqueda global ---- */
+var BQ_TMR=null;
+function abrirBusqueda(){
+  var m=document.getElementById('mBusq'); if(!m) return;
+  m.classList.remove('hidden'); ri();
+  setTimeout(function(){ var i=document.getElementById('iBusq'); if(i) i.focus(); },100);
+}
+function cerrarBusqueda(){
+  var m=document.getElementById('mBusq'); if(!m) return;
+  m.classList.add('hidden');
+  var i=document.getElementById('iBusq'); if(i) i.value='';
+  var r=document.getElementById('rBusq'); if(r) r.innerHTML='<p class="text-sm text-slate-400 text-center py-6">Escribe para buscar...</p>';
+}
+function ejecutarBusqueda(q){
+  clearTimeout(BQ_TMR);
+  q=(q||'').trim();
+  var r=document.getElementById('rBusq'); if(!r) return;
+  if(q.length<2){ r.innerHTML='<p class="text-sm text-slate-400 text-center py-6">Escribe al menos 2 caracteres...</p>'; return; }
+  r.innerHTML='<p class="text-sm text-slate-400 text-center py-4">Buscando...</p>';
+  BQ_TMR=setTimeout(async function(){
+    try{
+      var d=await rpcJson('busqueda_global',{p_q:q});
+      if(!d.length){ r.innerHTML='<p class="text-sm text-slate-400 text-center py-6">Sin resultados para "'+esc(q)+'"</p>'; return; }
+      var IC={miembro:'user',visitante:'user-plus',movimiento:'arrow-right-left'};
+      var CL={miembro:'indigo',visitante:'amber',movimiento:'emerald'};
+      var ET={miembro:'Miembro',visitante:'Visitante',movimiento:'Movimiento'};
+      r.innerHTML='<div class="space-y-1">'+d.map(function(x){
+        var ic=IC[x.tipo]||'search', cl=CL[x.tipo]||'slate', et=ET[x.tipo]||x.tipo;
+        var onclick='';
+        if(x.tipo==='miembro') onclick='cerrarBusqueda();perfilMiembro(\''+x.id+'\')';
+        else if(x.tipo==='visitante') onclick='cerrarBusqueda();ir(\'visitors\')';
+        else if(x.tipo==='movimiento') onclick='cerrarBusqueda();ir(\'treasury\')';
+        return '<button onclick="'+onclick+'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-left">'+
+          '<div class="w-9 h-9 rounded-lg bg-'+cl+'-100 text-'+cl+'-700 flex items-center justify-center flex-shrink-0"><i data-lucide="'+ic+'" class="w-4 h-4"></i></div>'+
+          '<div class="flex-1 min-w-0"><div class="font-medium text-slate-800 truncate">'+esc(x.titulo)+'</div>'+
+          (x.subtitulo?'<div class="text-xs text-slate-500 truncate">'+esc(x.subtitulo)+'</div>':'')+
+          '</div><span class="text-[10px] text-slate-400 flex-shrink-0">'+esc(et)+'</span></button>';
+      }).join('')+'</div>'; ri();
+    }catch(e){ r.innerHTML='<p class="text-sm text-red-500 text-center py-4">Error al buscar</p>'; }
+  }, 350);
+}
+document.addEventListener('keydown',function(e){ if((e.key==='k'&&(e.metaKey||e.ctrlKey))||e.key==='/') { e.preventDefault(); abrirBusqueda(); } });
+</script>
+<script>
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').catch(function(){});
+}
 </script>
 </body>
 </html>
