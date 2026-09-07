@@ -175,6 +175,7 @@ function antiguedad(fing){
   return {texto:texto,rango:r,color:c,meses:meses};
 }
 function hoy(){ var d=new Date(); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
+function hoyMenos(dias){ var d=new Date(); d.setDate(d.getDate()-dias); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
 function nomShow(m){ if(!m) return ''; var d=m.nombre_display; return (d&&(''+d).trim())?(''+d).trim():(m.nombre||''); }
 
 function toast(msg,tipo){
@@ -870,21 +871,102 @@ async function perfilMiembro(id, _tab){
     }
 
     if(tab==='asistencia'){
-      var att=await rpcJson('member_asistencia',{p_member_id:id,p_limit:10}).catch(function(){return [];});
-      var pct=await rpcJson('member_asistencia_pct',{p_member_id:id,p_dias:60}).catch(function(){return null;});
-      cuerpo='<div class="bg-white border border-slate-200 rounded-xl p-4 mb-3">'+
-        '<div class="grid grid-cols-2 gap-3 text-center">'+
-        '<div><div class="text-2xl font-bold '+(pct!=null?'text-indigo-600':'text-slate-400')+'">'+(pct!=null?pct+'%':'—')+'</div><div class="text-xs text-slate-500">% asistencia 60d</div></div>'+
-        '<div><div class="text-2xl font-bold text-slate-700">'+att.length+'</div><div class="text-xs text-slate-500">últimas registradas</div></div></div></div>'+
-        '<div class="space-y-1.5">'+
-        (att.length?att.map(function(a){
-          return '<div class="bg-white border border-slate-200 rounded-xl px-3 py-2.5 flex items-center justify-between">'+
-            '<div><div class="text-sm font-medium text-slate-700">'+esc(a.meeting_nombre)+'</div>'+
-            '<div class="text-xs text-slate-400">'+fecha(a.fecha)+'</div></div>'+
-            (a.asistio?'<span class="text-xs font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">Asistió</span>':
-                       '<span class="text-xs font-semibold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">Ausente</span>')+'</div>';
-        }).join('') : '<p class="text-sm text-slate-400 text-center py-6">Sin asistencias registradas.</p>')+
-        '</div><button onclick="closeModal(\'mP\')" class="mt-4 w-full py-3 bg-slate-100 rounded-xl font-medium">Cerrar</button>';
+      var comp=await rpcJson('member_comportamiento_asistencia',{
+        p_member_id:id,
+        p_desde: hoyMenos(90),
+        p_hasta: hoy()
+      }).catch(function(){return {servicios:[],detalle:[]};});
+      var srvs=comp.servicios||[];
+      var det=comp.detalle||[];
+
+      // --- Tarjetas resumen globales ---
+      var totPres=srvs.reduce(function(a,s){return a+Number(s.presentes);},0);
+      var totReg=srvs.reduce(function(a,s){return a+Number(s.total);},0);
+      var pctGlobal=totReg?Math.round(totPres/totReg*100):null;
+      cuerpo='<p class="text-[11px] text-slate-400 mb-3 flex items-center gap-1"><i data-lucide="calendar" class="w-3.5 h-3.5"></i>Últimos 3 meses</p>';
+      cuerpo+='<div class="grid grid-cols-3 gap-2 mb-4">'+
+        '<div class="bg-white border border-slate-200 rounded-xl p-3 text-center"><div class="text-xl font-bold '+(pctGlobal!=null?'text-indigo-600':'text-slate-300')+'">'+(pctGlobal!=null?pctGlobal+'%':'—')+'</div><div class="text-[10px] text-slate-500">asistencia global</div></div>'+
+        '<div class="bg-white border border-slate-200 rounded-xl p-3 text-center"><div class="text-xl font-bold text-emerald-600">'+totPres+'</div><div class="text-[10px] text-slate-500">presente</div></div>'+
+        '<div class="bg-white border border-slate-200 rounded-xl p-3 text-center"><div class="text-xl font-bold text-red-500">'+(totReg-totPres)+'</div><div class="text-[10px] text-slate-500">ausente</div></div>'+
+      '</div>';
+
+      // --- Barras por servicio ---
+      if(srvs.length){
+        var maxPres=Math.max.apply(null,srvs.map(function(s){return Number(s.presentes);}));
+        // Paleta por índice
+        var PAL=[['indigo','#6366f1'],['emerald','#10b981'],['amber','#f59e0b'],['violet','#8b5cf6'],['sky','#0ea5e9'],['rose','#f43f5e']];
+        cuerpo+='<div class="bg-white border border-slate-200 rounded-xl p-4 mb-4">'+
+          '<h4 class="text-sm font-bold text-slate-700 mb-3">Por servicio</h4>'+
+          srvs.map(function(s,i){
+            var pal=PAL[i%PAL.length];
+            var wPres=maxPres?Math.round(Number(s.presentes)/maxPres*100):0;
+            var wAus=maxPres?Math.round(Number(s.ausentes)/maxPres*100):0;
+            return '<div class="mb-3 last:mb-0">'+
+              '<div class="flex items-center justify-between mb-1">'+
+                '<span class="text-sm font-medium text-slate-700 truncate flex-1">'+esc(s.nombre)+'</span>'+
+                '<span class="text-xs text-slate-400 flex-shrink-0 ml-2">'+s.presentes+'/'+s.total+' · '+s.pct+'%</span>'+
+              '</div>'+
+              '<div class="flex gap-1 h-2.5">'+
+                '<div class="rounded-full transition-all" style="width:'+wPres+'%;background:'+pal[1]+';min-width:'+(s.presentes?4:0)+'px"></div>'+
+                (s.ausentes?'<div class="rounded-full bg-red-200" style="width:'+wAus+'%;min-width:4px"></div>':'')+
+              '</div>'+
+              '<div class="flex gap-3 mt-1 text-[10px] text-slate-400">'+
+                '<span style="color:'+pal[1]+'">● '+s.presentes+' presente'+(s.presentes!==1?'s':'')+'</span>'+
+                (s.ausentes?'<span class="text-red-400">● '+s.ausentes+' ausente'+(s.ausentes!==1?'s':'')+'</span>':'')+
+              '</div>'+
+            '</div>';
+          }).join('')+
+        '</div>';
+      } else {
+        cuerpo+='<div class="bg-white border border-slate-200 rounded-xl p-4 mb-4 text-center text-sm text-slate-400">Sin asistencia registrada en este período.</div>';
+      }
+
+      // --- Mapa de semanas (tipo GitHub heatmap) ---
+      if(det.length){
+        // Construir mapa: semana -> { servicioId -> {asistio, nombre} }
+        var semanas={}, semanasOrden=[];
+        det.forEach(function(d){
+          if(!semanas[d.semana]){ semanas[d.semana]={}; semanasOrden.push(d.semana); }
+          semanas[d.semana][d.meeting_type_id]={asistio:d.asistio,nombre:d.servicio,fecha:d.fecha};
+        });
+        // Lista de servicios únicos del detalle
+        var srvIds=[]; var srvNoms={};
+        det.forEach(function(d){ if(srvIds.indexOf(d.meeting_type_id)===-1){srvIds.push(d.meeting_type_id); srvNoms[d.meeting_type_id]=d.servicio;} });
+        var PAL2=['#6366f1','#10b981','#f59e0b','#8b5cf6','#0ea5e9','#f43f5e'];
+        var srvColor={};
+        srvIds.forEach(function(id,i){ srvColor[id]=PAL2[i%PAL2.length]; });
+
+        // Leyenda de servicios
+        var leyenda=srvIds.map(function(id,i){
+          return '<span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm inline-block" style="background:'+srvColor[id]+'"></span><span class="text-[10px] text-slate-500">'+esc(srvNoms[id])+'</span></span>';
+        }).join('');
+
+        // Filas del mapa: cada semana es una fila, cada columna es un servicio
+        var filas=semanasOrden.map(function(sem){
+          var d=new Date(sem+'T00:00:00');
+          var lab=d.getDate()+' '+MES_L[d.getMonth()+1].slice(0,3);
+          var celdas=srvIds.map(function(sid,i){
+            var reg=semanas[sem][sid];
+            if(!reg) return '<div class="w-7 h-7 rounded-md bg-slate-100"></div>';
+            var bg=reg.asistio?srvColor[sid]:'#fca5a5';
+            var title=esc(reg.nombre)+' · '+fecha(reg.fecha)+(reg.asistio?' ✓':' ✗');
+            return '<div class="w-7 h-7 rounded-md flex items-center justify-center" style="background:'+bg+'" title="'+title+'">'+
+              '<i data-lucide="'+(reg.asistio?'check':'x')+'" class="w-3.5 h-3.5 text-white"></i></div>';
+          }).join('');
+          return '<div class="flex items-center gap-2">'+
+            '<span class="text-[10px] text-slate-400 w-12 flex-shrink-0 text-right">'+lab+'</span>'+
+            '<div class="flex gap-1.5">'+celdas+'</div>'+
+          '</div>';
+        }).join('');
+
+        cuerpo+='<div class="bg-white border border-slate-200 rounded-xl p-4 mb-4">'+
+          '<h4 class="text-sm font-bold text-slate-700 mb-1">Historial por semana</h4>'+
+          '<div class="flex flex-wrap gap-3 mb-3">'+leyenda+'</div>'+
+          '<div class="space-y-1.5">'+filas+'</div>'+
+        '</div>';
+      }
+
+      cuerpo+='<button onclick="closeModal(\'mP\')" class="mt-2 w-full py-3 bg-slate-100 rounded-xl font-medium">Cerrar</button>';
     }
 
     if(tab==='finanzas' && esPastorAdmin){
