@@ -2848,7 +2848,12 @@ async function perfilMeta(id){
           '<button onclick="formMeta(\''+id+'\')" class="py-2.5 bg-slate-100 rounded-xl font-medium text-sm">Editar</button>'+
           '<button onclick="cambiarEstadoMeta(\''+id+'\',\''+(m.estado==='pausada'?'activa':'pausada')+'\')" class="py-2.5 bg-slate-100 rounded-xl font-medium text-sm">'+(m.estado==='pausada'?'Reactivar':'Pausar')+'</button>'+
         '</div>'+(puede(['admin','pastor'])?'<button onclick="borrarMeta(\''+id+'\')" class="w-full mt-2 py-2 text-red-600 text-sm">Eliminar meta</button>':'')
-      :(gestion&&m.estado==='cumplida'&&puede(['admin','pastor'])?'<button onclick="borrarMeta(\''+id+'\')" class="w-full mt-3 py-2 text-red-600 text-sm">Eliminar meta</button>':''))+
+      :(gestion&&m.estado==='cumplida'?
+        '<div class="grid grid-cols-2 gap-2 mt-4">'+
+          '<button onclick="formMeta(\''+id+'\')" class="py-2.5 bg-slate-100 rounded-xl font-medium text-sm flex items-center justify-center gap-1.5"><i data-lucide="pencil" class="w-4 h-4"></i>Editar</button>'+
+          '<button onclick="cambiarEstadoMeta(\''+id+'\',\'activa\')" class="py-2.5 bg-amber-100 text-amber-700 rounded-xl font-medium text-sm flex items-center justify-center gap-1.5"><i data-lucide="rotate-ccw" class="w-4 h-4"></i>Reabrir</button>'+
+        '</div>'+(puede(['admin','pastor'])?'<button onclick="borrarMeta(\''+id+'\')" class="w-full mt-2 py-2 text-red-600 text-sm">Eliminar meta</button>':'')
+      :''))+
     '</div>';
   modal('mMeta', body);
 }
@@ -2865,12 +2870,16 @@ function formMeta(id){
       '<div class="grid grid-cols-2 gap-3"><div><label class="text-sm font-medium">Cotización (L) *</label><input name="cotizacion" type="number" step="0.01" min="0" required value="'+(m.cotizacion!=null?m.cotizacion:'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div>'+
         '<div><label class="text-sm font-medium">Fecha límite</label><input name="fecha_meta" type="date" value="'+esc(m.fecha_meta||'')+'" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"></div></div>'+
       '<div><label class="text-sm font-medium">Descripción / cotización</label><textarea name="descripcion" rows="2" placeholder="Proveedor, detalles, enlace..." class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg">'+esc(m.descripcion||'')+'</textarea></div>'+
+      (id?'<div><label class="text-sm font-medium">Estado</label><select name="estado" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg bg-white">'+
+        [['activa','Activa'],['pausada','Pausada'],['cumplida','Cumplida']].map(function(o){ return '<option value="'+o[0]+'"'+((m.estado||'activa')===o[0]?' selected':'')+'>'+o[1]+'</option>'; }).join('')+
+      '</select></div>':'')+
       mFoot('mMF',id?'Guardar':'Crear')+'</form>');
     document.getElementById('fMF').onsubmit=async function(e){
       e.preventDefault(); var btn=e.target.querySelector('button[type=submit]'); btn.disabled=true;
       try{
         var fd=new FormData(e.target);
         var b={ nombre:fd.get('nombre'), categoria:fd.get('categoria'), prioridad:parseInt(fd.get('prioridad'),10)||2, cotizacion:parseFloat(fd.get('cotizacion'))||0, fecha_meta:fd.get('fecha_meta')||null, descripcion:(fd.get('descripcion')||'').trim()||null };
+        if(id && fd.get('estado')) b.estado=fd.get('estado');
         if(id) await dbPatch('metas','id=eq.'+id,b); else await dbPost('metas',b);
         toast('Meta guardada','success'); closeModal('mMF'); if(document.getElementById('mMeta')) closeModal('mMeta'); pintarMetas();
       }catch(err){ toast(err.message.slice(0,140),'error'); btn.disabled=false; }
