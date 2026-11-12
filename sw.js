@@ -1,5 +1,6 @@
-// ADULAM — Service Worker v1
-const CACHE = 'adulam-v1';
+// ADULAM — Service Worker v2
+// Red primero para la app (así cada publicación llega sola); la caché solo se usa sin internet.
+const CACHE = 'adulam-v2';
 const SHELL = ['app.html', 'manifest.json'];
 
 self.addEventListener('install', function(e){
@@ -15,22 +16,18 @@ self.addEventListener('activate', function(e){
 });
 
 self.addEventListener('fetch', function(e){
-  // Solo cachear el shell de la app; las peticiones a Supabase siempre van a la red
-  if(e.request.url.includes('supabase.co') || e.request.url.includes('lucide') || e.request.url.includes('tailwind')){
-    e.respondWith(fetch(e.request));
-    return;
-  }
+  if(e.request.method !== 'GET') return;
+  // Supabase y librerías externas: siempre a la red, sin tocar
+  if(e.request.url.includes('supabase.co') || e.request.url.includes('lucide') || e.request.url.includes('tailwind')) return;
   e.respondWith(
-    caches.match(e.request).then(function(cached){
-      return cached || fetch(e.request).then(function(resp){
-        if(resp && resp.status===200 && resp.type==='basic'){
-          var clone=resp.clone();
-          caches.open(CACHE).then(function(c){ c.put(e.request, clone); });
-        }
-        return resp;
-      });
+    fetch(e.request).then(function(resp){
+      if(resp && resp.status===200 && resp.type==='basic'){
+        var clone=resp.clone();
+        caches.open(CACHE).then(function(c){ c.put(e.request, clone); });
+      }
+      return resp;
     }).catch(function(){
-      return caches.match('app.html');
+      return caches.match(e.request).then(function(cached){ return cached || caches.match('app.html'); });
     })
   );
 });
