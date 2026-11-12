@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="assets/icon-192.png">
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script src="https://unpkg.com/lucide@1.63.0/dist/umd/lucide.min.js"></script>
 <style>
 html,body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-tap-highlight-color:transparent}
 input:not([type=checkbox]):not([type=radio]):not([type=file]),select,textarea{font-size:16px;min-height:44px}
@@ -1417,7 +1417,7 @@ var ROLES_CULTO=[
   ['anuncios_id','Anuncios','megaphone']
 ];
 function lunesDe(d){ d=new Date(d); var g=(d.getDay()+6)%7; d.setDate(d.getDate()-g); d.setHours(12,0,0,0); return d; }
-function ymd(d){ return d.toISOString().slice(0,10); }
+function ymd(d){ d=new Date(d); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function addDias(d,n){ var x=new Date(d); x.setDate(x.getDate()+n); return x; }
 function horaTxt(h){ if(!h) return ''; var p=String(h).split(':'); var H=parseInt(p[0]),M=p[1]; var ap=H>=12?'p.m.':'a.m.'; var h12=H%12||12; return h12+':'+M+' '+ap; }
 
@@ -2915,18 +2915,6 @@ function formActividad(id){
     };
   })();
 }
-async function registrarAporte(actId){
-  await metInit();
-  if(!MET.fondoId){ toast('No se encontró la caja del fondo','error'); return; }
-  var a=(await dbGet('actividades','id=eq.'+actId+'&select=nombre'))[0]; if(!a) return;
-  var val=prompt('Registrar lo recaudado en "'+a.nombre+'".\n¿Monto que ingresó al fondo? (L)','');
-  if(val===null) return;
-  var n=parseFloat(val); if(isNaN(n)||n<=0){ toast('Monto inválido','warning'); return; }
-  try{
-    await dbPost('treasury',{ caja_id:MET.fondoId, tipo:'ingreso', categoria_id:MET.catIng||null, actividad_id:actId, monto:n, fecha:hoy(), metodo:'efectivo', descripcion:'Actividad: '+a.nombre, registrado_por:(S.user?S.user.id:null) });
-    toast('Ingreso registrado en el fondo','success'); pintarMetas();
-  }catch(e){ toast(e.message.slice(0,150),'error'); }
-}
 async function asignarMeta(id){
   await metInit();
   var m=(await dbGet('metas','id=eq.'+id+'&select=nombre,asignado,cotizacion'))[0]; if(!m) return;
@@ -2938,20 +2926,6 @@ async function asignarMeta(id){
   if(n>disp+0.001){ toast('El fondo no tiene tanto disponible','warning'); return; }
   try{ await dbPatch('metas','id=eq.'+id,{asignado:n}); toast('Fondo repartido','success'); closeModal('mMeta'); pintarMetas(); }
   catch(e){ toast(e.message.slice(0,140),'error'); }
-}
-async function comprarMeta(id){
-  await metInit();
-  if(!MET.fondoId){ toast('No se encontró la caja del fondo','error'); return; }
-  var m=(await dbGet('metas','id=eq.'+id+'&select=nombre,cotizacion'))[0]; if(!m) return;
-  var val=prompt('Registrar la compra de "'+m.nombre+'".\n¿Monto real pagado? (sale del fondo)', m.cotizacion);
-  if(val===null) return;
-  var n=parseFloat(val); if(isNaN(n)||n<0){ toast('Monto inválido','warning'); return; }
-  if(!confirm('Se registrará un egreso de '+dinero(n)+' del Fondo de Metas y la meta quedará como cumplida. ¿Continuar?')) return;
-  try{
-    await dbPost('treasury',{ caja_id:MET.fondoId, tipo:'egreso', categoria_id:MET.catEgr||null, meta_id:id, monto:n, fecha:hoy(), metodo:'efectivo', descripcion:'Compra: '+m.nombre, registrado_por:(S.user?S.user.id:null) });
-    await dbPatch('metas','id=eq.'+id,{estado:'cumplida'});
-    toast('Compra registrada · meta cumplida','success'); closeModal('mMeta'); pintarMetas();
-  }catch(e){ toast(e.message.slice(0,150),'error'); }
 }
 async function cambiarEstadoMeta(id,est){ try{ await dbPatch('metas','id=eq.'+id,{estado:est}); toast('Actualizado','success'); closeModal('mMeta'); pintarMetas(); }catch(e){ toast(e.message.slice(0,120),'error'); } }
 async function borrarMeta(id){ if(!confirm('¿Eliminar esta meta? (No borra los movimientos de tesorería ya registrados)')) return; try{ await dbDel('metas','id=eq.'+id); toast('Eliminada','success'); closeModal('mMeta'); pintarMetas(); }catch(e){ toast(e.message.slice(0,120),'error'); } }
@@ -3022,33 +2996,105 @@ function formParticipante(actId, pid){
     };
   })();
 }
+/* Formulario único para movimientos del Fondo de Metas: siempre deja el vínculo
+   (actividad_id / meta_id) y una descripción que nombra la actividad o meta. */
+async function formMovFondo(o){
+  await metInit();
+  if(!MET.fondoId){ toast('No se encontró la caja "Fondo de Metas"','error'); return; }
+  var ing=o.tipo==='ingreso';
+  var mets=[['efectivo','Efectivo'],['transferencia','Transferencia'],['deposito','Depósito'],['cheque','Cheque'],['tarjeta','Tarjeta'],['otro','Otro']];
+  var inp='w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg';
+  modal('mMvF', mHead(esc(o.titulo),'mMvF')+
+   '<form id="fMvF" class="p-4 space-y-3">'+
+   '<div class="rounded-xl border '+(ing?'bg-emerald-50 border-emerald-200 text-emerald-800':'bg-red-50 border-red-200 text-red-800')+' px-3 py-2.5 text-sm flex items-start gap-2">'+
+     '<i data-lucide="link" class="w-4 h-4 mt-0.5 flex-shrink-0"></i><div><div class="font-semibold">'+esc(o.base)+'</div>'+
+     '<div class="text-xs opacity-80">'+(ing?'Ingreso':'Egreso')+' en Fondo de Metas · queda vinculado y visible en Tesorería</div></div></div>'+
+   (o.ayuda?'<p class="text-xs text-slate-500">'+o.ayuda+'</p>':'')+
+   '<div class="grid grid-cols-2 gap-3">'+
+     '<div><label class="text-sm font-medium">Monto (L) *</label><input name="monto" type="number" step="0.01" min="0.01" required inputmode="decimal" value="'+(o.monto!=null&&Number(o.monto)>0?o.monto:'')+'" class="'+inp+'"></div>'+
+     '<div><label class="text-sm font-medium">Fecha *</label><input name="fecha" type="date" required value="'+hoy()+'" max="'+hoy()+'" class="'+inp+'"></div>'+
+   '</div>'+
+   '<div class="grid grid-cols-2 gap-3">'+
+     '<div><label class="text-sm font-medium">Método</label><select name="metodo" class="'+inp+' bg-white">'+mets.map(function(k){ return '<option value="'+k[0]+'">'+k[1]+'</option>'; }).join('')+'</select></div>'+
+     '<div><label class="text-sm font-medium">'+(o.refLabel||'Referencia / N° recibo')+'</label><input name="referencia" class="'+inp+'"></div>'+
+   '</div>'+
+   '<div><label class="text-sm font-medium">Detalle'+(o.detalleReq?' *':' <span class="text-xs text-slate-400 font-normal">(opcional)</span>')+'</label>'+
+     '<input name="detalle" id="mvfDet"'+(o.detalleReq?' required':'')+' maxlength="160" placeholder="'+esc(o.placeholder||'')+'" class="'+inp+'"></div>'+
+   '<div class="text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2">Se guardará como: <b id="mvfPrev" class="text-slate-700"></b></div>'+
+   '<div><label class="text-sm font-medium flex items-center gap-1.5"><i data-lucide="paperclip" class="w-4 h-4"></i>Comprobantes <span class="text-xs text-slate-400 font-normal">(opcional)</span></label>'+
+     '<input name="comprobantes" type="file" accept="image/*,application/pdf" multiple class="w-full mt-1 text-sm file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700"></div>'+
+   mFoot('mMvF', o.boton||'Registrar')+'</form>');
+  var armar=function(){ var d=(document.getElementById('mvfDet').value||'').trim(); return o.base+(d?' · '+d:''); };
+  var prev=function(){ var p=document.getElementById('mvfPrev'); if(p) p.textContent=armar(); };
+  document.getElementById('mvfDet').oninput=prev; prev();
+  document.getElementById('fMvF').onsubmit=async function(e){
+    e.preventDefault();
+    var btn=e.target.querySelector('button[type=submit]'); btn.disabled=true;
+    try{
+      var fd=new FormData(e.target), n=Math.round(parseFloat(fd.get('monto'))*100)/100;
+      if(isNaN(n)||n<=0){ toast('Monto inválido','warning'); btn.disabled=false; return; }
+      if(o.confirmar && !confirm(o.confirmar(n))){ btn.disabled=false; return; }
+      var body={ caja_id:MET.fondoId, tipo:o.tipo, categoria_id:o.categoria_id||null, actividad_id:o.actividad_id||null, meta_id:o.meta_id||null,
+                 monto:n, fecha:fd.get('fecha')||hoy(), metodo:fd.get('metodo')||'efectivo', descripcion:armar().slice(0,250),
+                 referencia:(fd.get('referencia')||'').trim()||null, registrado_por:(S.user?S.user.id:null) };
+      var res=await dbPost('treasury',body), tid=(res&&res[0])?res[0].id:null;
+      var files=e.target.querySelector('input[name=comprobantes]'), lista=files&&files.files?Array.prototype.slice.call(files.files):[];
+      if(tid && lista.length){
+        var errc=0;
+        for(var i=0;i<lista.length;i++){ if(lista[i].size>5*1024*1024){ errc++; continue; } try{ await subirComprobante(lista[i], MET.fondoId, tid); }catch(ce){ errc++; } }
+        if(errc) toast(errc+' comprobante(s) no se pudieron subir','warning');
+      }
+      if(o.despues) await o.despues(n, tid);
+      TZ.org=null;
+      toast(o.ok||'Movimiento registrado','success'); closeModal('mMvF');
+      if(o.refrescar) o.refrescar();
+    }catch(err){ btn.disabled=false; toast(String(err.message).slice(0,160),'error'); }
+  };
+}
+function metRefrescarAct(actId){ if(document.getElementById('mActD')) perfilActividad(actId); if(document.getElementById('metLista')) pintarMetas(); }
+
+async function registrarAporte(actId){
+  await metInit();
+  var a=(await dbGet('actividades','id=eq.'+actId+'&select=nombre'))[0]; if(!a) return;
+  formMovFondo({ titulo:'Ingreso de la actividad', tipo:'ingreso', categoria_id:MET.catIng, actividad_id:actId,
+    base:'Actividad «'+a.nombre+'» · ingreso', placeholder:'Ej: venta del domingo, donación', ok:'Ingreso registrado en el fondo',
+    refrescar:function(){ metRefrescarAct(actId); } });
+}
 async function pagoParticipante(pid, actId){
   await metInit();
-  if(!MET.fondoId){ toast('No se encontró la caja del fondo','error'); return; }
   var p=(await dbGet('actividad_participantes','id=eq.'+pid+'&select=*,members(nombre,nombre_display)'))[0]; if(!p) return;
+  var a=(await dbGet('actividades','id=eq.'+actId+'&select=nombre,precio_unitario'))[0]||{nombre:'actividad'};
   var quien=p.members?nomShow(p.members):(p.nombre_externo||'vendedor');
-  var val=prompt('¿Cuánto entregó '+quien+'? (entra al fondo como ingreso)','');
-  if(val===null) return;
-  var n=parseFloat(val); if(isNaN(n)||n<=0){ toast('Monto inválido','warning'); return; }
-  try{
-    await dbPost('treasury',{ caja_id:MET.fondoId, tipo:'ingreso', categoria_id:MET.catIng||null, actividad_id:actId, monto:n, fecha:hoy(), metodo:'efectivo', descripcion:'Pago vendedor: '+quien, registrado_por:(S.user?S.user.id:null) });
-    await dbPatch('actividad_participantes','id=eq.'+pid,{ pagado:Number(p.pagado)+n });
-    toast('Pago registrado','success'); perfilActividad(actId);
-  }catch(e){ toast(e.message.slice(0,150),'error'); }
+  var pend=a.precio_unitario?Number(p.vendidos)*Number(a.precio_unitario)-Number(p.pagado)-Number(p.condonado||0):null;
+  formMovFondo({ titulo:'Pago de vendedor', tipo:'ingreso', categoria_id:MET.catIng, actividad_id:actId,
+    base:'Actividad «'+a.nombre+'» · pago de '+quien, monto:(pend!=null&&pend>0?Math.round(pend*100)/100:null),
+    ayuda:(pend!=null?'Saldo pendiente de '+esc(quien)+': <b>'+dinero(Math.max(0,pend))+'</b>':''),
+    placeholder:'Opcional', ok:'Pago registrado',
+    despues:async function(n){
+      // Releer justo antes de sumar para no pisar otro pago registrado al mismo tiempo
+      var act=(await dbGet('actividad_participantes','id=eq.'+pid+'&select=pagado'))[0]||{pagado:0};
+      await dbPatch('actividad_participantes','id=eq.'+pid,{ pagado:Math.round((Number(act.pagado)+n)*100)/100 });
+    },
+    refrescar:function(){ metRefrescarAct(actId); } });
 }
 async function registrarGastoActividad(actId){
   await metInit();
-  if(!MET.fondoId){ toast('No se encontró la caja del fondo','error'); return; }
-  var monto=prompt('Registrar gasto de la actividad.\n¿Monto? (L)','');
-  if(monto===null) return;
-  var n=parseFloat(monto); if(isNaN(n)||n<=0){ toast('Monto inválido','warning'); return; }
-  var desc=prompt('¿En qué se gastó? (ej. ingredientes, impresión)','');
-  if(desc===null) return; desc=(desc||'').trim()||'Gasto de actividad';
-  var factura=prompt('N.º de factura o recibo (opcional):','');
-  try{
-    await dbPost('treasury',{ caja_id:MET.fondoId, tipo:'egreso', categoria_id:(MET.catGasto||MET.catEgr)||null, actividad_id:actId, monto:n, fecha:hoy(), metodo:'efectivo', descripcion:desc, referencia:(factura||'').trim()||null, registrado_por:(S.user?S.user.id:null) });
-    toast('Gasto registrado','success'); perfilActividad(actId);
-  }catch(e){ toast(e.message.slice(0,150),'error'); }
+  var a=(await dbGet('actividades','id=eq.'+actId+'&select=nombre'))[0]; if(!a) return;
+  formMovFondo({ titulo:'Gasto de la actividad', tipo:'egreso', categoria_id:(MET.catGasto||MET.catEgr), actividad_id:actId,
+    base:'Actividad «'+a.nombre+'» · gasto', detalleReq:true, placeholder:'¿En qué se gastó? Ej: ingredientes, impresión',
+    refLabel:'N° factura / recibo', ok:'Gasto registrado', boton:'Registrar gasto',
+    refrescar:function(){ metRefrescarAct(actId); } });
+}
+async function comprarMeta(id){
+  await metInit();
+  var m=(await dbGet('metas','id=eq.'+id+'&select=nombre,cotizacion'))[0]; if(!m) return;
+  formMovFondo({ titulo:'Compra de la meta', tipo:'egreso', categoria_id:MET.catEgr, meta_id:id,
+    base:'Meta «'+m.nombre+'» · compra', monto:m.cotizacion, placeholder:'Proveedor, modelo, etc.',
+    refLabel:'N° factura / recibo', boton:'Registrar compra', ok:'Compra registrada · meta cumplida',
+    ayuda:'Cotización: <b>'+dinero(m.cotizacion)+'</b>. Al registrar, la meta queda como <b>cumplida</b>.',
+    confirmar:function(n){ return 'Se registrará un egreso de '+dinero(n)+' del Fondo de Metas y la meta quedará como cumplida. ¿Continuar?'; },
+    despues:async function(){ await dbPatch('metas','id=eq.'+id,{estado:'cumplida'}); },
+    refrescar:function(){ closeModal('mMeta'); if(document.getElementById('metLista')) pintarMetas(); } });
 }
 async function borrarParticipante(pid, actId){ if(!confirm('¿Quitar este vendedor?')) return; try{ await dbDel('actividad_participantes','id=eq.'+pid); toast('Quitado','success'); closeModal('mPart'); perfilActividad(actId); }catch(e){ toast(e.message.slice(0,120),'error'); } }
 async function condonarParticipante(pid, actId, pendiente){
@@ -3347,8 +3393,8 @@ function render_stats(mem, etapas, crec, asis, vis, casas, finMes, finCat, dec, 
 var TZ = { cajas:[], cats:[], perfiles:[], caja:null, tab:'cajas' };
 
 function fechaHora(f){ if(!f) return '-'; try{ return new Date(f).toLocaleString('es-HN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}); }catch(e){ return '-'; } }
-function mesActual(){ return new Date().toISOString().slice(0,7); }
-function rangoMes(m){ var p=String(m||mesActual()).split('-'), a=parseInt(p[0],10), n=parseInt(p[1],10); return [p[0]+'-'+p[1]+'-01', new Date(a,n,0).toISOString().slice(0,10)]; }
+function mesActual(){ return hoy().slice(0,7); }
+function rangoMes(m){ var p=String(m||mesActual()).split('-'), a=parseInt(p[0],10), n=parseInt(p[1],10); return [p[0]+'-'+p[1]+'-01', p[0]+'-'+p[1]+'-'+String(new Date(a,n,0).getDate()).padStart(2,'0')]; }
 function uid4(){ try{ return crypto.randomUUID(); }catch(e){ return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){var r=Math.random()*16|0;return (c==='x'?r:(r&0x3|0x8)).toString(16);}); } }
 
 function finAdmin(){ return puede(['admin','pastor']); }
@@ -3366,7 +3412,7 @@ function spin(){ return '<div class="text-center py-10 text-slate-400"><i data-l
 async function view_treasury(){
   var p=document.getElementById('page');
   if(!finAuditor() && !S.misCajas){ p.innerHTML=vacio('lock','No tienes ninguna caja asignada.'); ri(); return; }
-  var tabs=[['cajas','wallet','Cajas'],['movs','receipt','Movimientos'],['informe','file-bar-chart','Informe']];
+  var tabs=[['cajas','wallet','Cajas'],['movs','receipt','Movimientos'],['revision','search-check','Revisión'],['informe','file-bar-chart','Informe']];
   if(finAuditor()) tabs.push(['presupuesto','target','Presupuesto']);
   var mas=[];
   if(finAuditor()) mas.push(['recibos','receipt-text','Recibos de aportante']);
@@ -3387,6 +3433,7 @@ async function view_treasury(){
   p.innerHTML=tabH+'</div><div id="tzBody">'+spin()+'</div>';
   ri();
   if(TZ.tab==='movs') await pintarMovs();
+  else if(TZ.tab==='revision') await pintarRevision();
   else if(TZ.tab==='cats') await pintarCats();
   else if(TZ.tab==='informe') await pintarInforme();
   else if(TZ.tab==='presupuesto') await pintarPresupuesto();
@@ -3402,8 +3449,10 @@ async function tzRefrescar(){
   await tzCajas(true);
   if(TZ.caja) await tzVerCaja(TZ.caja);
   else if(TZ.tab==='movs') await pintarMovs();
+  else if(TZ.tab==='revision') await cargarRevision();
   else if(TZ.tab==='cats') await pintarCats();
-  else await pintarCajas();
+  else if(TZ.tab==='cajas') await pintarCajas();
+  else await view_treasury();
 }
 
 /* ----- Listado de cajas ----- */
@@ -3558,6 +3607,7 @@ async function verMovimiento(id){
         dRow('calendar','Fecha del movimiento',fecha(m.fecha))+
         dRow('credit-card','Método',esc(met[m.metodo]||m.metodo||'—')+(m.referencia?' · Ref: '+esc(m.referencia):''))+
         (m.descripcion?dRow('align-left','Descripción',esc(m.descripcion)):'')+
+        '<div id="movOrigen"></div>'+
         (m.notas?dRow('sticky-note','Notas',esc(m.notas)):'')+
         dRow('user','Registrado por',esc(m.registrado_por_nombre||'Desconocido')+' <span class="text-slate-400">('+esc(m.registrado_por_rol||'—')+')</span>')+
         dRow('clock','Marca de tiempo',fechaHora(m.created_at))+
@@ -3573,7 +3623,21 @@ async function verMovimiento(id){
       '</div>');
     var cl=document.getElementById('compList');
     if(cl) pintarComprobantes(m.id, cl, edit);
+    pintarOrigenMov(m);
   }catch(e){ toast(e.message.slice(0,120),'error'); }
+}
+async function vinculoMov(m){
+  if(typeof m.actividad_id!=='undefined' || typeof m.meta_id!=='undefined') return { actividad_id:m.actividad_id||null, meta_id:m.meta_id||null };
+  try{ return (await dbGet('treasury','id=eq.'+m.id+'&select=actividad_id,meta_id'))[0]||{}; }catch(e){ return {}; }
+}
+async function pintarOrigenMov(m){
+  var el=document.getElementById('movOrigen'); if(!el) return;
+  var v=await vinculoMov(m); if(!v.actividad_id && !v.meta_id) return;
+  var o=await tzOrigenes(), es=!!v.actividad_id, nom=es?o.act[v.actividad_id]:o.meta[v.meta_id];
+  var fn=es?"closeModal('mDet');perfilActividad('"+v.actividad_id+"')":"closeModal('mDet');perfilMeta('"+v.meta_id+"')";
+  el.innerHTML=dRow(es?'party-popper':'target', es?'Actividad vinculada':'Meta vinculada',
+    '<button type="button" onclick="'+fn+'" class="text-indigo-700 font-semibold hover:underline text-left">'+esc(nom||'(no disponible)')+'</button>');
+  ri();
 }
 async function editarMovimiento(id){
   var d=await dbGet('v_movimientos','id=eq.'+id+'&select=*');
@@ -3581,7 +3645,10 @@ async function editarMovimiento(id){
   if(d[0]) formMovimiento(d[0].caja_id, d[0].tipo, d[0]);
 }
 async function borrarMovimiento(id){
-  if(!confirm('¿Eliminar este movimiento? El saldo de la caja se recalculará.')) return;
+  var v=await vinculoMov({id:id}), extra='';
+  if(v.actividad_id) extra='\n\nOJO: está vinculado a una actividad. Si era el pago de un vendedor, su "pagado" NO se descuenta solo: corrígelo en la actividad.';
+  else if(v.meta_id) extra='\n\nOJO: es la compra de una meta. La meta seguirá como "cumplida": reábrela si corresponde.';
+  if(!confirm('¿Eliminar este movimiento? El saldo de la caja se recalculará.'+extra)) return;
   try{ await dbDel('treasury','id=eq.'+id); closeModal('mDet'); toast('Movimiento eliminado','success'); await tzRefrescar(); }
   catch(e){ toast(e.message.slice(0,140),'error'); }
 }
@@ -3792,6 +3859,276 @@ async function cargarMovs(){
   }catch(e){ el.innerHTML='<div class="text-sm text-red-600 p-3">'+esc(e.message.slice(0,150))+'</div>'; }
 }
 
+/* ----- Revisión de movimientos (auditoría con filtros avanzados) ----- */
+TZ.rv = null;           // filtros vigentes
+TZ.rvDatos = [];        // filas cargadas
+TZ.rvOrden = { campo:'fecha', dir:-1 };
+TZ.org = null;          // nombres de metas/actividades { act:{id:nombre}, meta:{id:nombre} }
+
+function rvDefaults(){ var r=rangoMes(mesActual()); return { desde:r[0], hasta:r[1], cajas:[], usuarios:[], cats:[], tipo:'', min:'', max:'', origen:'', metodo:'', texto:'', transf:true, sinComp:false }; }
+
+async function tzOrigenes(f){
+  if(TZ.org && !f) return TZ.org;
+  var o={ act:{}, meta:{} };
+  try{ (await dbGet('actividades','select=id,nombre&order=nombre.asc')).forEach(function(a){ o.act[a.id]=a.nombre; }); }catch(e){}
+  try{ (await dbGet('metas','select=id,nombre&order=nombre.asc')).forEach(function(m){ o.meta[m.id]=m.nombre; }); }catch(e){}
+  TZ.org=o; return o;
+}
+function rvOrigenTxt(m){
+  var o=TZ.org||{act:{},meta:{}};
+  if(m.actividad_id) return 'Actividad: '+(o.act[m.actividad_id]||'(no disponible)');
+  if(m.meta_id) return 'Meta: '+(o.meta[m.meta_id]||'(no disponible)');
+  return '';
+}
+
+/* Multi-selección compacta con casillas */
+function rvMulti(id, etiqueta, items, sel){
+  var mapa={}; (sel||[]).forEach(function(v){ mapa[v]=1; });
+  var grupoAct=null, cuerpo='';
+  items.forEach(function(it){
+    if(it[2] && it[2]!==grupoAct){ grupoAct=it[2]; cuerpo+='<div class="text-[10px] font-bold uppercase tracking-wide text-slate-400 px-2 pt-2 pb-1">'+esc(grupoAct)+'</div>'; }
+    cuerpo+='<label class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer text-sm"><input type="checkbox" class="w-4 h-4 flex-shrink-0" value="'+esc(it[0])+'"'+(mapa[it[0]]?' checked':'')+' onchange="rvMultiTxt(\''+id+'\')"><span class="truncate">'+esc(it[1])+'</span></label>';
+  });
+  return '<details id="'+id+'" class="rvms relative">'+
+    '<summary class="list-none [&::-webkit-details-marker]:hidden w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white cursor-pointer flex items-center gap-2">'+
+      '<span class="text-slate-500 flex-shrink-0">'+etiqueta+':</span><span class="rvmsTxt font-medium text-slate-800 truncate flex-1"></span><i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 flex-shrink-0"></i></summary>'+
+    '<div class="absolute z-30 mt-1 left-0 right-0 min-w-[230px] max-h-72 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-xl p-1.5">'+
+      '<div class="flex gap-3 px-2 py-1.5 border-b border-slate-100 mb-1 text-xs"><button type="button" onclick="rvMultiTodo(\''+id+'\',true)" class="text-indigo-600 font-semibold">Marcar todo</button><button type="button" onclick="rvMultiTodo(\''+id+'\',false)" class="text-slate-500 font-semibold">Limpiar</button></div>'+
+      (items.length?cuerpo:'<p class="text-xs text-slate-400 p-2">Sin opciones</p>')+
+    '</div></details>';
+}
+function rvMultiVal(id){ var d=document.getElementById(id); if(!d) return []; return Array.prototype.slice.call(d.querySelectorAll('input[type=checkbox]:checked')).map(function(x){ return x.value; }); }
+function rvMultiTxt(id){
+  var d=document.getElementById(id); if(!d) return;
+  var tot=d.querySelectorAll('input[type=checkbox]').length, ch=d.querySelectorAll('input[type=checkbox]:checked');
+  var t=d.querySelector('.rvmsTxt');
+  if(!ch.length || ch.length===tot) t.textContent='Todas';
+  else if(ch.length===1) t.textContent=ch[0].parentNode.textContent;
+  else t.textContent=ch.length+' seleccionadas';
+}
+function rvMultiTodo(id,v){ var d=document.getElementById(id); if(!d) return; d.querySelectorAll('input[type=checkbox]').forEach(function(x){ x.checked=v; }); rvMultiTxt(id); }
+function rvCerrarMultis(e){
+  document.querySelectorAll('details.rvms[open]').forEach(function(d){ if(!d.contains(e.target)) d.removeAttribute('open'); });
+}
+if(!window.__rvCierre){ window.__rvCierre=true; document.addEventListener('click', rvCerrarMultis); }
+
+function rvPreset(k){
+  var d=new Date(), y=d.getFullYear(), m=d.getMonth()+1, de, ha;
+  var p2=function(n){ return String(n).padStart(2,'0'); };
+  if(k==='hoy'){ de=ha=hoy(); }
+  else if(k==='mes'){ var r=rangoMes(mesActual()); de=r[0]; ha=r[1]; }
+  else if(k==='ant'){ var ma=m-1, ya=y; if(ma<1){ ma=12; ya--; } var r2=rangoMes(ya+'-'+p2(ma)); de=r2[0]; ha=r2[1]; }
+  else if(k==='30'){ de=hoyMenos(29); ha=hoy(); }
+  else if(k==='anio'){ de=y+'-01-01'; ha=y+'-12-31'; }
+  document.getElementById('rvDesde').value=de; document.getElementById('rvHasta').value=ha;
+  cargarRevision();
+}
+
+async function pintarRevision(){
+  var b=document.getElementById('tzBody'); b.innerHTML=spin(); ri();
+  var cs=await tzCajas(); await tzCats(); await tzOrigenes(true);
+  try{ await tzPerfiles(); }catch(e){}
+  var f=TZ.rv||(TZ.rv=rvDefaults());
+  var inp='px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white w-full';
+  var itCajas=cs.map(function(c){ return [c.id, c.nombre+(c.activa?'':' (inactiva)')]; });
+  var itUsers=(TZ.perfiles||[]).map(function(p){ return [p.id, p.nombre||'—']; });
+  var itCats=TZ.cats.slice().sort(function(a,b){ return a.tipo===b.tipo?0:(a.tipo==='ingreso'?-1:1); })
+    .map(function(c){ return [c.id, c.nombre+(c.activa?'':' (inactiva)'), c.tipo==='ingreso'?'Ingresos':'Egresos']; });
+  var o=TZ.org, acts=Object.keys(o.act), metas=Object.keys(o.meta);
+  var opOrigen='<option value="">Todos los orígenes</option><option value="manual">Solo registros manuales</option><option value="cualquiera">Cualquier meta o actividad</option>'+
+    (acts.length?'<optgroup label="Actividades">'+acts.sort(function(a,b){ return o.act[a].localeCompare(o.act[b]); }).map(function(k){ return '<option value="act:'+k+'">'+esc(o.act[k])+'</option>'; }).join('')+'</optgroup>':'')+
+    (metas.length?'<optgroup label="Metas">'+metas.sort(function(a,b){ return o.meta[a].localeCompare(o.meta[b]); }).map(function(k){ return '<option value="meta:'+k+'">'+esc(o.meta[k])+'</option>'; }).join('')+'</optgroup>':'');
+  var mets=[['','Todos los métodos'],['efectivo','Efectivo'],['transferencia','Transferencia'],['deposito','Depósito'],['cheque','Cheque'],['tarjeta','Tarjeta'],['otro','Otro']];
+  var chip=function(k,t){ return '<button type="button" onclick="rvPreset(\''+k+'\')" class="px-2.5 py-1 rounded-full bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-xs font-medium text-slate-600">'+t+'</button>'; };
+
+  b.innerHTML=
+   '<div class="bg-white rounded-2xl border border-slate-200 p-4 mb-4">'+
+    '<div class="flex items-center gap-2 mb-3"><i data-lucide="search-check" class="w-5 h-5 text-indigo-600"></i><h4 class="font-bold text-slate-800">Revisión de movimientos</h4></div>'+
+    '<div class="grid grid-cols-2 gap-2 mb-2">'+
+      '<label class="text-xs text-slate-500">Desde<input id="rvDesde" type="date" value="'+esc(f.desde)+'" class="'+inp+' mt-0.5"></label>'+
+      '<label class="text-xs text-slate-500">Hasta<input id="rvHasta" type="date" value="'+esc(f.hasta)+'" class="'+inp+' mt-0.5"></label>'+
+    '</div>'+
+    '<div class="flex flex-wrap gap-1.5 mb-3">'+chip('hoy','Hoy')+chip('mes','Este mes')+chip('ant','Mes anterior')+chip('30','Últimos 30 días')+chip('anio','Este año')+'</div>'+
+    '<div class="grid sm:grid-cols-3 gap-2 mb-2">'+
+      rvMulti('rvCajas','Cajas',itCajas,f.cajas)+
+      rvMulti('rvUsers','Usuario',itUsers,f.usuarios)+
+      rvMulti('rvCats','Categoría',itCats,f.cats)+
+    '</div>'+
+    '<div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">'+
+      '<select id="rvTipo" class="'+inp+'">'+[['','Ingresos y egresos'],['ingreso','Solo ingresos'],['egreso','Solo egresos'],['transf','Solo transferencias']].map(function(x){ return '<option value="'+x[0]+'"'+(f.tipo===x[0]?' selected':'')+'>'+x[1]+'</option>'; }).join('')+'</select>'+
+      '<select id="rvMetodo" class="'+inp+'">'+mets.map(function(x){ return '<option value="'+x[0]+'"'+(f.metodo===x[0]?' selected':'')+'>'+x[1]+'</option>'; }).join('')+'</select>'+
+      '<input id="rvMin" type="number" step="0.01" min="0" inputmode="decimal" placeholder="Monto mín. L" value="'+esc(f.min)+'" class="'+inp+'">'+
+      '<input id="rvMax" type="number" step="0.01" min="0" inputmode="decimal" placeholder="Monto máx. L" value="'+esc(f.max)+'" class="'+inp+'">'+
+    '</div>'+
+    '<div class="grid sm:grid-cols-2 gap-2 mb-3">'+
+      '<select id="rvOrigen" class="'+inp+'">'+opOrigen+'</select>'+
+      '<input id="rvTexto" type="search" placeholder="Buscar en descripción, referencia o notas" value="'+esc(f.texto)+'" onkeydown="if(event.key===\'Enter\'){event.preventDefault();cargarRevision();}" class="'+inp+'">'+
+    '</div>'+
+    '<div class="flex flex-wrap items-center gap-x-4 gap-y-2 mb-3 text-sm text-slate-600">'+
+      '<label class="flex items-center gap-2 cursor-pointer"><input id="rvTransf" type="checkbox" class="w-4 h-4"'+(f.transf?' checked':'')+'>Incluir transferencias entre cajas</label>'+
+      '<label class="flex items-center gap-2 cursor-pointer"><input id="rvSinComp" type="checkbox" class="w-4 h-4"'+(f.sinComp?' checked':'')+'>Solo sin comprobante</label>'+
+    '</div>'+
+    '<div class="flex flex-wrap gap-2">'+
+      '<button onclick="cargarRevision()" class="flex-1 sm:flex-none px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl flex items-center justify-center gap-2"><i data-lucide="search" class="w-4 h-4"></i>Buscar</button>'+
+      '<button onclick="TZ.rv=rvDefaults();pintarRevision()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl font-medium text-sm flex items-center gap-1.5"><i data-lucide="eraser" class="w-4 h-4"></i>Limpiar</button>'+
+      '<button onclick="rvExportarCSV()" class="px-4 py-2.5 bg-white border border-slate-300 hover:bg-slate-50 rounded-xl font-medium text-sm flex items-center gap-1.5"><i data-lucide="download" class="w-4 h-4"></i>Exportar CSV</button>'+
+    '</div>'+
+   '</div>'+
+   '<div id="rvTot" class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3"></div>'+
+   '<div id="rvAviso"></div>'+
+   '<div id="rvTabla">'+spin()+'</div>';
+  var sel=document.getElementById('rvOrigen'); if(sel) sel.value=f.origen||'';
+  ['rvCajas','rvUsers','rvCats'].forEach(rvMultiTxt);
+  ri();
+  await cargarRevision();
+}
+
+function rvLeerFiltros(){
+  var g=function(id){ var e=document.getElementById(id); return e?e.value:''; };
+  var f={ desde:g('rvDesde'), hasta:g('rvHasta'), cajas:rvMultiVal('rvCajas'), usuarios:rvMultiVal('rvUsers'), cats:rvMultiVal('rvCats'),
+          tipo:g('rvTipo'), min:g('rvMin'), max:g('rvMax'), origen:g('rvOrigen'), metodo:g('rvMetodo'), texto:(g('rvTexto')||'').trim(),
+          transf:!!(document.getElementById('rvTransf')||{}).checked, sinComp:!!(document.getElementById('rvSinComp')||{}).checked };
+  // "Todas" marcadas equivale a sin filtro
+  var n=function(id){ var d=document.getElementById(id); return d?d.querySelectorAll('input[type=checkbox]').length:0; };
+  if(f.cajas.length===n('rvCajas')) f.cajas=[];
+  if(f.usuarios.length===n('rvUsers')) f.usuarios=[];
+  if(f.cats.length===n('rvCats')) f.cats=[];
+  return f;
+}
+function rvQuery(f){
+  var q=[];
+  if(f.desde) q.push('fecha=gte.'+f.desde);
+  if(f.hasta) q.push('fecha=lte.'+f.hasta);
+  if(f.cajas.length) q.push('caja_id=in.('+f.cajas.join(',')+')');
+  if(f.usuarios.length) q.push('registrado_por=in.('+f.usuarios.join(',')+')');
+  if(f.cats.length) q.push('categoria_id=in.('+f.cats.join(',')+')');
+  if(f.tipo==='ingreso'||f.tipo==='egreso') q.push('tipo=eq.'+f.tipo);
+  if(f.tipo==='transf') q.push('transferencia_id=not.is.null');
+  else if(!f.transf) q.push('transferencia_id=is.null');
+  if(f.min!=='' && !isNaN(parseFloat(f.min))) q.push('monto=gte.'+parseFloat(f.min));
+  if(f.max!=='' && !isNaN(parseFloat(f.max))) q.push('monto=lte.'+parseFloat(f.max));
+  if(f.metodo) q.push('metodo=eq.'+f.metodo);
+  if(f.origen==='manual') q.push('actividad_id=is.null&meta_id=is.null');
+  else if(f.origen==='cualquiera') q.push('or=(actividad_id.not.is.null,meta_id.not.is.null)');
+  else if(f.origen.indexOf('act:')===0) q.push('actividad_id=eq.'+f.origen.slice(4));
+  else if(f.origen.indexOf('meta:')===0) q.push('meta_id=eq.'+f.origen.slice(5));
+  if(f.sinComp) q.push('n_comprobantes=eq.0');
+  if(f.texto){
+    var t=f.texto.replace(/[(),*"\\]/g,' ').replace(/\s+/g,' ').trim();
+    if(t){ var e=encodeURIComponent('*'+t+'*'); q.push('or=(descripcion.ilike.'+e+',referencia.ilike.'+e+',notas.ilike.'+e+')'); }
+  }
+  // Dos filtros "or" no pueden repetirse en PostgREST: se combinan con and()
+  var ors=q.filter(function(x){ return x.indexOf('or=')===0; });
+  if(ors.length>1){
+    q=q.filter(function(x){ return x.indexOf('or=')!==0; });
+    q.push('and=('+ors.map(function(x){ return 'or'+x.slice(3); }).join(',')+')');
+  }
+  return q.join('&');
+}
+
+var RV_MAX=5000;
+async function cargarRevision(){
+  var el=document.getElementById('rvTabla'); if(!el) return;
+  var f=rvLeerFiltros(); TZ.rv=f;
+  if(f.desde && f.hasta && f.desde>f.hasta){ toast('La fecha "desde" es posterior a "hasta"','warning'); return; }
+  if(f.min!=='' && f.max!=='' && parseFloat(f.min)>parseFloat(f.max)){ toast('El monto mínimo es mayor que el máximo','warning'); return; }
+  el.innerHTML=spin(); ri();
+  document.querySelectorAll('details.rvms[open]').forEach(function(d){ d.removeAttribute('open'); });
+  var sel='id,fecha,tipo,monto,descripcion,referencia,notas,metodo,caja_id,caja_nombre,categoria_id,categoria_nombre,categoria,registrado_por,registrado_por_nombre,created_at,transferencia_id,actividad_id,meta_id,n_comprobantes';
+  try{
+    var q=rvQuery(f), filas=[], pag=1000, off=0, mas=true;
+    while(mas && filas.length<RV_MAX){
+      var d=await dbGet('v_movimientos',(q?q+'&':'')+'select='+sel+'&order=fecha.desc,created_at.desc,id.desc&limit='+pag+'&offset='+off);
+      filas=filas.concat(d); off+=pag; mas=d.length===pag;
+    }
+    var truncado=mas;
+    filas.forEach(function(m){
+      m._caja=m.caja_nombre||'—'; m._cat=m.categoria_nombre||m.categoria||'Sin categoría';
+      m._user=m.registrado_por_nombre||'—'; m._origen=rvOrigenTxt(m);
+      m._signo=(m.tipo==='ingreso'?1:-1)*Number(m.monto);
+    });
+    TZ.rvDatos=filas;
+    var ing=0, egr=0;
+    filas.forEach(function(m){ if(m.tipo==='ingreso') ing+=Number(m.monto); else egr+=Number(m.monto); });
+    var kp=function(lab,val,c){ return '<div class="bg-'+c+'-50 border border-'+c+'-200 rounded-xl p-3"><div class="text-[11px] text-'+c+'-700">'+lab+'</div><div class="font-bold text-'+c+'-700 text-sm sm:text-base">'+val+'</div></div>'; };
+    var tot=document.getElementById('rvTot');
+    if(tot) tot.innerHTML=kp('Movimientos',filas.length.toLocaleString('es-HN'),'slate')+kp('Ingresos',dinero(ing),'emerald')+kp('Egresos',dinero(egr),'red')+kp('Neto',dinero(ing-egr),'indigo');
+    var av=document.getElementById('rvAviso');
+    if(av){
+      var avisos=[];
+      if(truncado) avisos.push('Se muestran los primeros '+RV_MAX.toLocaleString('es-HN')+' movimientos. Acota los filtros para ver el resto; los totales solo cubren lo mostrado.');
+      if(f.transf && f.tipo!=='transf' && filas.some(function(m){ return m.transferencia_id; }) && !f.cajas.length) avisos.push('Incluye transferencias entre cajas: suman tanto en ingresos como en egresos (el neto no cambia). Desmarca "Incluir transferencias" para ver solo dinero que entra o sale de la iglesia.');
+      av.innerHTML=avisos.map(function(t){ return '<div class="mb-3 text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-3 flex gap-2"><i data-lucide="info" class="w-4 h-4 flex-shrink-0"></i><span>'+t+'</span></div>'; }).join('');
+    }
+    rvPintarTabla();
+  }catch(e){ el.innerHTML='<div class="text-sm text-red-600 p-3 bg-red-50 rounded-xl">'+esc(String(e.message).slice(0,200))+'</div>'; }
+}
+
+function rvOrdenar(campo){
+  if(TZ.rvOrden.campo===campo) TZ.rvOrden.dir*=-1; else TZ.rvOrden={ campo:campo, dir:(campo==='fecha'||campo==='created_at'||campo==='_signo')?-1:1 };
+  rvPintarTabla();
+}
+function rvPintarTabla(){
+  var el=document.getElementById('rvTabla'); if(!el) return;
+  var d=TZ.rvDatos||[];
+  if(!d.length){ el.innerHTML='<div class="bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-400"><i data-lucide="search-x" class="w-10 h-10 mx-auto mb-2 opacity-40"></i><p class="text-sm">Ningún movimiento coincide con los filtros.</p></div>'; ri(); return; }
+  var o=TZ.rvOrden, c=o.campo;
+  d=d.slice().sort(function(a,b){
+    var x=a[c], y=b[c];
+    if(c==='_signo'){ x=Number(x); y=Number(y); }
+    else { x=String(x==null?'':x).toLowerCase(); y=String(y==null?'':y).toLowerCase(); }
+    if(x<y) return -1*o.dir; if(x>y) return 1*o.dir;
+    return String(b.created_at||'').localeCompare(String(a.created_at||''));
+  });
+  var th=function(campo,txt,cls){
+    var act=o.campo===campo;
+    return '<th class="px-3 py-2.5 font-semibold text-left whitespace-nowrap '+(cls||'')+'"><button type="button" onclick="rvOrdenar(\''+campo+'\')" class="inline-flex items-center gap-1 hover:text-indigo-700 '+(act?'text-indigo-700':'')+'">'+txt+
+      '<i data-lucide="'+(act?(o.dir>0?'arrow-up':'arrow-down'):'arrow-up-down')+'" class="w-3 h-3 '+(act?'':'opacity-40')+'"></i></button></th>';
+  };
+  el.innerHTML='<div class="bg-white rounded-2xl border border-slate-200 overflow-hidden"><div class="overflow-x-auto">'+
+    '<table class="w-full text-sm min-w-[760px]"><thead class="bg-slate-50 text-xs text-slate-500 uppercase tracking-wide border-b border-slate-200"><tr>'+
+      th('fecha','Fecha')+th('descripcion','Descripción')+th('_caja','Caja')+th('_signo','Monto','text-right')+th('created_at','Marca de tiempo')+th('_user','Usuario')+
+    '</tr></thead><tbody class="divide-y divide-slate-100">'+
+    d.map(function(m){
+      var ing=m.tipo==='ingreso';
+      return '<tr onclick="verMovimiento(\''+m.id+'\')" class="hover:bg-indigo-50/40 cursor-pointer align-top">'+
+        '<td class="px-3 py-2.5 whitespace-nowrap text-slate-700">'+fecha(m.fecha)+'</td>'+
+        '<td class="px-3 py-2.5 max-w-[320px]"><div class="text-slate-800 truncate">'+(m.descripcion?esc(m.descripcion):'<span class="text-slate-400 italic">Sin descripción</span>')+
+          (m.n_comprobantes>0?' <i data-lucide="paperclip" class="w-3 h-3 inline text-indigo-500"></i>':'')+'</div>'+
+          '<div class="flex flex-wrap gap-1 mt-0.5">'+
+            '<span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">'+esc(m._cat)+'</span>'+
+            (m._origen?'<span class="text-[10px] px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">'+esc(m._origen)+'</span>':'')+
+            (m.transferencia_id?'<span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-700">Transferencia</span>':'')+
+            (m.referencia?'<span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">Ref '+esc(m.referencia)+'</span>':'')+
+          '</div></td>'+
+        '<td class="px-3 py-2.5 text-slate-700 whitespace-nowrap">'+esc(m._caja)+'</td>'+
+        '<td class="px-3 py-2.5 text-right font-semibold whitespace-nowrap '+(ing?'text-emerald-700':'text-red-700')+'">'+(ing?'+':'−')+dinero(m.monto)+'</td>'+
+        '<td class="px-3 py-2.5 whitespace-nowrap text-xs text-slate-500">'+fechaHora(m.created_at)+'</td>'+
+        '<td class="px-3 py-2.5 whitespace-nowrap text-slate-700">'+esc(m._user)+'</td>'+
+      '</tr>';
+    }).join('')+
+    '</tbody></table></div></div>'+
+    '<p class="text-[11px] text-slate-400 mt-2 px-1">Toca una fila para ver el detalle, comprobantes y editar. Toca un encabezado para ordenar.</p>';
+  ri();
+}
+
+function rvExportarCSV(){
+  var d=TZ.rvDatos||[];
+  if(!d.length){ toast('No hay movimientos para exportar','warning'); return; }
+  var met={efectivo:'Efectivo',transferencia:'Transferencia',cheque:'Cheque',deposito:'Depósito',tarjeta:'Tarjeta',otro:'Otro'};
+  var q=function(v){ v=String(v==null?'':v); return '"'+v.replace(/"/g,'""')+'"'; };
+  var filas=[['Fecha','Descripción','Categoría','Origen','Caja','Tipo','Monto','Método','Referencia','Comprobantes','Marca de tiempo','Usuario','ID']];
+  d.forEach(function(m){
+    filas.push([m.fecha, m.descripcion||'', m._cat, m._origen||'', m._caja, (m.transferencia_id?'Transferencia ':'')+(m.tipo==='ingreso'?'Ingreso':'Egreso'),
+      (m.tipo==='ingreso'?'':'-')+Number(m.monto).toFixed(2), met[m.metodo]||m.metodo||'', m.referencia||'', m.n_comprobantes||0, fechaHora(m.created_at), m._user, m.id]);
+  });
+  var csv='\ufeff'+filas.map(function(r){ return r.map(q).join(','); }).join('\r\n');
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  var f=TZ.rv||{}; a.download='movimientos_'+(f.desde||'')+'_'+(f.hasta||'')+'.csv';
+  document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },500);
+}
+
 /* ----- Cajas: alta y edición ----- */
 async function editarCaja(id){ var d=await dbGet('cajas','id=eq.'+id+'&select=*'); if(d[0]) formCaja(d[0]); }
 async function formCaja(c){
@@ -3830,7 +4167,7 @@ async function formCaja(c){
           '<label class="flex items-center gap-1 text-[11px] text-slate-500 flex-shrink-0"><input type="checkbox" class="cjEsc w-3.5 h-3.5" data-uid="'+p.id+'" '+(escribe?'checked':'')+' '+(asignado?'':'disabled')+'>escribe</label>'+
         '</div>';
       }).join(''):'<p class="text-xs text-slate-400 p-3">No hay usuarios con perfil disponibles.</p>')+'</div>'+
-     '<p class="text-xs text-slate-500 mt-1">Marca quién puede <b>ver</b> esta caja. La casilla "escribe" permite además registrar y editar movimientos. La administración (admin/pastor/tesorero) siempre tiene acceso total.</p></div>'+
+     '<p class="text-xs text-slate-500 mt-1">Marca quién puede <b>ver</b> esta caja. La casilla "escribe" permite además registrar y editar movimientos. La administración (admin y pastor) siempre tiene acceso total.</p></div>'+
    '<div><label class="text-sm font-medium">Ministerio (opcional)</label><select name="team_id" class="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-lg"><option value="">—</option>'+
      eqs.map(function(t){ return '<option value="'+t.id+'"'+(c.team_id===t.id?' selected':'')+'>'+esc(t.nombre)+'</option>'; }).join('')+'</select></div>'+
    '<div class="grid grid-cols-2 gap-3">'+
@@ -4077,7 +4414,7 @@ async function datosInforme(){
   // Movimientos sin comprobante (para control)
   var sinComp=[];
   try{
-    var movs=await dbGet('treasury','fecha=gte.'+desde+'&fecha=lte.'+hasta+(caja?'&caja_id=eq.'+caja:'')+'&select=id,tipo,monto,descripcion,fecha,caja_id,n_comprobantes&order=fecha.asc&limit=500');
+    var movs=await dbGet('v_movimientos','fecha=gte.'+desde+'&fecha=lte.'+hasta+(caja?'&caja_id=eq.'+caja:'')+'&select=id,tipo,monto,descripcion,fecha,caja_id,n_comprobantes&order=fecha.asc&limit=500');
     sinComp=movs.filter(function(m){ return !m.n_comprobantes||m.n_comprobantes===0; });
   }catch(e){}
   // Metas del período
@@ -4381,8 +4718,10 @@ async function cerrarMes(){
   if(!confirm('¿Cerrar '+MES_L[mes]+' '+anio+'? Se bloquearán todos sus movimientos.'))return;
   try{
     var ini=anio+'-'+String(mes).padStart(2,'0')+'-01';
-    var fin=new Date(anio,mes,0).toISOString().slice(0,10);
-    var d=await dbGet('treasury','fecha=gte.'+ini+'&fecha=lte.'+fin+'&select=tipo,monto');
+    var fin=anio+'-'+String(mes).padStart(2,'0')+'-'+String(new Date(anio,mes,0).getDate()).padStart(2,'0');
+    // Sin transferencias internas (inflan ingresos y egresos) y paginado (PostgREST corta en 1000 filas)
+    var d=[], off=0, pg;
+    do{ pg=await dbGet('treasury','fecha=gte.'+ini+'&fecha=lte.'+fin+'&transferencia_id=is.null&select=tipo,monto&order=id&limit=1000&offset='+off); d=d.concat(pg); off+=1000; }while(pg.length===1000);
     var ing=0,egr=0; d.forEach(function(t){ if(t.tipo==='ingreso') ing+=Number(t.monto); else egr+=Number(t.monto); });
     await dbPost('cierres_mes',{ anio:anio, mes:mes, total_ingresos:ing, total_egresos:egr, saldo_cierre:ing-egr });
     toast('Mes cerrado','success'); pintarCierres();
@@ -4701,7 +5040,7 @@ async function pintarPosts(){
   if(est) q+='&estado=eq.'+est;
   var d=await dbGet('social_posts',q);
   var cl={pendiente:'bg-slate-100 text-slate-700',en_diseno:'bg-amber-100 text-amber-700',aprobado:'bg-blue-100 text-blue-700',publicado:'bg-emerald-100 text-emerald-700'};
-  var ic={instagram:'instagram',facebook:'facebook',tiktok:'music-2',whatsapp:'message-circle'};
+  var ic={instagram:'camera',facebook:'thumbs-up',tiktok:'music-2',whatsapp:'message-circle'};
   var g=document.getElementById('soGrid');
   if(!d.length){ g.innerHTML=vacio('share-2','Sin contenido planificado.'); ri(); return; }
   g.innerHTML=d.map(function(p){
