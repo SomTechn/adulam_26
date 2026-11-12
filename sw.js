@@ -1,7 +1,7 @@
 // ADULAM — Service Worker v2
 // Red primero para la app (así cada publicación llega sola); la caché solo se usa sin internet.
-const CACHE = 'adulam-v2';
-const SHELL = ['app.html', 'manifest.json'];
+const CACHE = 'adulam-v3';
+const SHELL = ['./', 'manifest.json'];
 
 self.addEventListener('install', function(e){
   e.waitUntil(caches.open(CACHE).then(function(c){ return c.addAll(SHELL); }));
@@ -27,7 +27,7 @@ self.addEventListener('fetch', function(e){
       }
       return resp;
     }).catch(function(){
-      return caches.match(e.request).then(function(cached){ return cached || caches.match('app.html'); });
+      return caches.match(e.request).then(function(cached){ return cached || caches.match('./'); });
     })
   );
 });

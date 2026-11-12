@@ -11,6 +11,6 @@
   try{sessionStorage.clear();m('sessionStorage limpio',true);}catch(e){}
   try{var dbs=await indexedDB.databases();for(var d of dbs){indexedDB.deleteDatabase(d.name);}m(dbs.length+' bases IndexedDB borradas',true);}catch(e){}
   l+='\nLimpieza completa. Redirigiendo al login en 3s...';s.textContent=l;
-  setTimeout(function(){var p=window.location.pathname;window.location.href=p.substring(0,p.lastIndexOf('/')+1)+'login.html';},3000);
+  setTimeout(function(){var p=window.location.pathname;window.location.href=p.substring(0,p.lastIndexOf('/')+1);},3000);
 })();
 </script></body></html>
