@@ -18,6 +18,10 @@ input:not([type=checkbox]):not([type=radio]):not([type=file]),select,textarea{fo
 @keyframes su{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 .asu{animation:su .28s cubic-bezier(.16,1,.3,1)}
 ::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px}
+/* Evita desbordes horizontales en móvil: las celdas de grid pueden encogerse y los textos largos se parten */
+.grid>*{min-width:0}
+.kpiv{white-space:nowrap;letter-spacing:-.02em;font-size:clamp(10px,2.9vw,16px)}
+#page,body>div.fixed{overflow-wrap:break-word}
 .lc2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 @media print{#sidebar,#topbar,#bottomnav,.np{display:none!important}body{background:#fff!important}}
 .flyer{background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)}
@@ -103,6 +107,7 @@ input:not([type=checkbox]):not([type=radio]):not([type=file]),select,textarea{fo
     <header id="topbar" class="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-slate-200 px-4 lg:px-8 py-3 flex items-center gap-3">
       <button class="lg:hidden p-2 -ml-2 rounded-lg hover:bg-slate-100" onclick="openNav()"><i data-lucide="menu" class="w-6 h-6"></i></button>
       <h2 id="pageTitle" class="text-lg lg:text-xl font-bold text-slate-800 truncate flex-1"></h2>
+      <span id="rtDot" class="flex items-center gap-1.5 text-[11px] font-semibold flex-shrink-0 px-1" title="Tiempo real"></span>
       <button onclick="abrirBusqueda()" class="p-2 rounded-lg hover:bg-slate-100 text-slate-500 flex-shrink-0" title="Búsqueda global"><i data-lucide="search" class="w-5 h-5"></i></button>
     </header>
     <!-- Modal búsqueda global -->
@@ -206,7 +211,35 @@ function mFoot(id,txt){ return '<div class="flex gap-2 pt-2"><button type="butto
 function vacio(icon,txt){ return '<div class="col-span-full text-center py-12 text-slate-400"><i data-lucide="'+icon+'" class="w-12 h-12 mx-auto mb-3 opacity-40"></i><p>'+txt+'</p></div>'; }
 
 /* ---------- capa de red (fetch con timeout) ---------- */
+/* Renueva la sesión antes de que venza (dura 1 hora). Sin esto la app empezaba a dar errores tras una hora abierta. */
+var _refP=null;
+function asegurarSesion(forzar){
+  if(!S.session) return Promise.resolve('sin');
+  if(!forzar && !expirada(S.session)) return Promise.resolve('ok');
+  if(!S.session.refresh_token) return Promise.resolve('vencida');
+  if(!_refP){
+    _refP=req0('/auth/v1/token?grant_type=refresh_token',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ refresh_token:S.session.refresh_token }) },10000)
+      .then(async function(r){
+        if(!r.ok) return (r.status>=400 && r.status<500)?'vencida':'error';
+        var d=await r.json(); if(!d.access_token) return 'error';
+        d.expires_at=Math.floor(Date.now()/1000)+(d.expires_in||3600);
+        saveSession(d); if(d.user) S.user=d.user; return 'ok';
+      }).catch(function(){ return 'error'; })
+      .then(function(x){ _refP=null; return x; });
+  }
+  return _refP;
+}
 function req(path, opts, ms){
+  if(path.indexOf('/auth/v1/')!==0 && S.session && expirada(S.session)){
+    return asegurarSesion().then(function(x){
+      if(x==='vencida'){ clearSession(); toast('Tu sesión venció. Inicia sesión de nuevo.','warning'); setTimeout(function(){ location.reload(); },1500); throw new Error('Sesión vencida'); }
+      if(x==='error') throw new Error('Sin conexión para renovar la sesión. Revisa tu internet.');
+      return req0(path, opts, ms);
+    });
+  }
+  return req0(path, opts, ms);
+}
+function req0(path, opts, ms){
   ms = ms || 12000;
   opts = opts || {};
   var ctrl = new AbortController();
@@ -389,6 +422,7 @@ function errorPagina(e){
 /* ---------- catálogos en caché ---------- */
 async function cat(nombre, query){
   if(S.cache[nombre]) return S.cache[nombre];
+  S.cacheQ = S.cacheQ || {}; S.cacheQ[nombre] = query;
   S.cache[nombre] = await dbGet(nombre, query);
   return S.cache[nombre];
 }
@@ -2544,7 +2578,7 @@ async function view_pastoral(){
       '<button onclick="formIngresoPastoral()" class="px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl flex items-center gap-2"><i data-lucide="plus" class="w-5 h-5"></i>Nuevo ingreso</button>'+
       '<div class="text-[11px] text-slate-400 flex items-center gap-1 text-right leading-tight"><i data-lucide="lock" class="w-3.5 h-3.5 flex-shrink-0"></i>Privado ·<br>aparte de tesorería</div></div>'+
     '<div id="ipResumen" class="mb-3"></div>'+
-    '<div class="flex gap-1.5 p-1 bg-slate-100 rounded-xl mb-3">'+tab('mov','list','Movimientos')+tab('stats','bar-chart-3','Estadísticas')+tab('pers','users','Por miembro')+'</div>'+
+    '<div class="flex gap-1.5 p-1 bg-slate-100 rounded-xl mb-3 overflow-x-auto">'+tab('mov','list','Movimientos')+tab('stats','bar-chart-3','Estadísticas')+tab('pers','users','Por miembro')+'</div>'+
     '<div id="ipTab"></div>';
   ri(); await pintarPastoral();
 }
@@ -3540,9 +3574,9 @@ async function tzVerCaja(id){
       '<div class="min-w-0 flex-1"><h3 class="text-lg font-bold text-slate-800">'+esc(c.nombre)+'</h3>'+
       '<p class="text-xs text-slate-500">'+esc(c.tipo)+' · Responsables: '+(c.responsables_nombres?esc(c.responsables_nombres):(c.responsable_nombre?esc(c.responsable_nombre):'sin asignar'))+'</p></div></div>'+
       '<div class="grid grid-cols-3 gap-3 text-center">'+
-        '<div class="bg-slate-50 rounded-xl p-3"><div class="text-[11px] text-slate-500 mb-0.5">Saldo</div><div class="font-bold '+(s<0?'text-red-600':'text-slate-800')+'">'+dinero(s)+'</div></div>'+
-        '<div class="bg-emerald-50 rounded-xl p-3"><div class="text-[11px] text-emerald-700 mb-0.5">Ingresos</div><div class="font-bold text-emerald-700">'+dinero(c.total_ingresos)+'</div></div>'+
-        '<div class="bg-red-50 rounded-xl p-3"><div class="text-[11px] text-red-700 mb-0.5">Egresos</div><div class="font-bold text-red-700">'+dinero(c.total_egresos)+'</div></div>'+
+        '<div class="bg-slate-50 rounded-xl p-3"><div class="text-[11px] text-slate-500 mb-0.5">Saldo</div><div class="kpiv font-bold '+(s<0?'text-red-600':'text-slate-800')+'">'+dinero(s)+'</div></div>'+
+        '<div class="bg-emerald-50 rounded-xl p-3"><div class="text-[11px] text-emerald-700 mb-0.5">Ingresos</div><div class="kpiv font-bold text-emerald-700">'+dinero(c.total_ingresos)+'</div></div>'+
+        '<div class="bg-red-50 rounded-xl p-3"><div class="text-[11px] text-red-700 mb-0.5">Egresos</div><div class="kpiv font-bold text-red-700">'+dinero(c.total_egresos)+'</div></div>'+
       '</div>'+
       (c.descripcion?'<p class="text-sm text-slate-600 mt-3">'+esc(c.descripcion)+'</p>':'')+
       (edit?'<div class="grid grid-cols-2 gap-2 mt-4">'+
@@ -3939,7 +3973,7 @@ async function pintarRevision(){
     (acts.length?'<optgroup label="Actividades">'+acts.sort(function(a,b){ return o.act[a].localeCompare(o.act[b]); }).map(function(k){ return '<option value="act:'+k+'">'+esc(o.act[k])+'</option>'; }).join('')+'</optgroup>':'')+
     (metas.length?'<optgroup label="Metas">'+metas.sort(function(a,b){ return o.meta[a].localeCompare(o.meta[b]); }).map(function(k){ return '<option value="meta:'+k+'">'+esc(o.meta[k])+'</option>'; }).join('')+'</optgroup>':'');
   var mets=[['','Todos los métodos'],['efectivo','Efectivo'],['transferencia','Transferencia'],['deposito','Depósito'],['cheque','Cheque'],['tarjeta','Tarjeta'],['otro','Otro']];
-  var chip=function(k,t){ return '<button type="button" onclick="rvPreset(\''+k+'\')" class="px-2.5 py-1 rounded-full bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-xs font-medium text-slate-600">'+t+'</button>'; };
+  var chip=function(k,t){ return '<button type="button" onclick="rvPreset(\''+k+'\')" class="px-3 py-1.5 rounded-full bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-xs font-medium text-slate-600">'+t+'</button>'; };
 
   b.innerHTML=
    '<div class="bg-white rounded-2xl border border-slate-200 p-4 mb-4">'+
@@ -4085,8 +4119,31 @@ function rvPintarTabla(){
     return '<th class="px-3 py-2.5 font-semibold text-left whitespace-nowrap '+(cls||'')+'"><button type="button" onclick="rvOrdenar(\''+campo+'\')" class="inline-flex items-center gap-1 hover:text-indigo-700 '+(act?'text-indigo-700':'')+'">'+txt+
       '<i data-lucide="'+(act?(o.dir>0?'arrow-up':'arrow-down'):'arrow-up-down')+'" class="w-3 h-3 '+(act?'':'opacity-40')+'"></i></button></th>';
   };
-  el.innerHTML='<div class="bg-white rounded-2xl border border-slate-200 overflow-hidden"><div class="overflow-x-auto">'+
-    '<table class="w-full text-sm min-w-[760px]"><thead class="bg-slate-50 text-xs text-slate-500 uppercase tracking-wide border-b border-slate-200"><tr>'+
+  var tarjetas='<div class="sm:hidden">'+
+    '<div class="flex items-center gap-2 mb-2 text-xs text-slate-500"><span>Ordenar:</span><select onchange="TZ.rvOrden={campo:this.value.split(\'|\')[0],dir:Number(this.value.split(\'|\')[1])};rvPintarTabla()" class="flex-1 px-2 py-1.5 border border-slate-300 rounded-lg bg-white text-sm">'+
+      [['fecha|-1','Fecha: más reciente'],['fecha|1','Fecha: más antigua'],['_signo|-1','Monto: mayor primero'],['_signo|1','Monto: menor primero'],['created_at|-1','Registro: más reciente'],['_caja|1','Caja'],['_user|1','Usuario']]
+        .map(function(x){ return '<option value="'+x[0]+'"'+((o.campo+'|'+o.dir)===x[0]?' selected':'')+'>'+x[1]+'</option>'; }).join('')+'</select></div>'+
+    '<div class="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">'+
+    d.map(function(m){
+      var ing=m.tipo==='ingreso';
+      return '<div onclick="verMovimiento(\''+m.id+'\')" class="p-3 active:bg-slate-50 cursor-pointer">'+
+        '<div class="flex items-start justify-between gap-3"><div class="min-w-0 flex-1 text-sm font-medium text-slate-800">'+(m.descripcion?esc(m.descripcion):'<span class="text-slate-400 italic font-normal">Sin descripción</span>')+
+          (m.n_comprobantes>0?' <i data-lucide="paperclip" class="w-3 h-3 inline text-indigo-500"></i>':'')+'</div>'+
+        '<div class="font-bold whitespace-nowrap '+(ing?'text-emerald-700':'text-red-700')+'">'+(ing?'+':'−')+dinero(m.monto)+'</div></div>'+
+        '<div class="flex flex-wrap gap-1 mt-1">'+
+          '<span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">'+esc(m._cat)+'</span>'+
+          (m._origen?'<span class="text-[10px] px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">'+esc(m._origen)+'</span>':'')+
+          (m.transferencia_id?'<span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-700">Transferencia</span>':'')+
+          (m.referencia?'<span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">Ref '+esc(m.referencia)+'</span>':'')+'</div>'+
+        '<div class="grid grid-cols-2 gap-x-3 gap-y-0.5 mt-1.5 text-[11px] text-slate-500">'+
+          '<div><span class="text-slate-400">Fecha:</span> <b class="text-slate-700">'+fecha(m.fecha)+'</b></div>'+
+          '<div class="truncate"><span class="text-slate-400">Caja:</span> '+esc(m._caja)+'</div>'+
+          '<div class="truncate"><span class="text-slate-400">Usuario:</span> '+esc(m._user)+'</div>'+
+          '<div class="truncate"><span class="text-slate-400">Registrado:</span> '+fechaHora(m.created_at)+'</div>'+
+        '</div></div>';
+    }).join('')+'</div></div>';
+  el.innerHTML=tarjetas+'<div class="hidden sm:block bg-white rounded-2xl border border-slate-200 overflow-hidden"><div class="overflow-x-auto">'+
+    '<table class="w-full text-sm min-w-[720px]"><thead class="bg-slate-50 text-xs text-slate-500 uppercase tracking-wide border-b border-slate-200"><tr>'+
       th('fecha','Fecha')+th('descripcion','Descripción')+th('_caja','Caja')+th('_signo','Monto','text-right')+th('created_at','Marca de tiempo')+th('_user','Usuario')+
     '</tr></thead><tbody class="divide-y divide-slate-100">'+
     d.map(function(m){
@@ -4101,10 +4158,10 @@ function rvPintarTabla(){
             (m.transferencia_id?'<span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-700">Transferencia</span>':'')+
             (m.referencia?'<span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">Ref '+esc(m.referencia)+'</span>':'')+
           '</div></td>'+
-        '<td class="px-3 py-2.5 text-slate-700 whitespace-nowrap">'+esc(m._caja)+'</td>'+
+        '<td class="px-3 py-2.5 text-slate-700">'+esc(m._caja)+'</td>'+
         '<td class="px-3 py-2.5 text-right font-semibold whitespace-nowrap '+(ing?'text-emerald-700':'text-red-700')+'">'+(ing?'+':'−')+dinero(m.monto)+'</td>'+
-        '<td class="px-3 py-2.5 whitespace-nowrap text-xs text-slate-500">'+fechaHora(m.created_at)+'</td>'+
-        '<td class="px-3 py-2.5 whitespace-nowrap text-slate-700">'+esc(m._user)+'</td>'+
+        '<td class="px-3 py-2.5 text-xs text-slate-500">'+fechaHora(m.created_at)+'</td>'+
+        '<td class="px-3 py-2.5 text-slate-700">'+esc(m._user)+'</td>'+
       '</tr>';
     }).join('')+
     '</tbody></table></div></div>'+
@@ -4446,9 +4503,9 @@ function htmlInforme(r){
     (r.cierre?'<span class="inline-flex items-center gap-1 mt-1 text-[11px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold"><i data-lucide="lock" class="w-3 h-3"></i>Mes cerrado</span>':'<span class="inline-flex items-center gap-1 mt-1 text-[11px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-semibold">Provisional</span>')+
     '</div>'+
     '<div class="grid grid-cols-3 gap-3 mb-5 text-center">'+
-      '<div class="bg-emerald-50 rounded-xl p-3"><div class="text-[11px] text-emerald-700 uppercase">Ingresos</div><div class="font-bold text-emerald-700">'+dinero(totIng)+'</div></div>'+
-      '<div class="bg-red-50 rounded-xl p-3"><div class="text-[11px] text-red-700 uppercase">Egresos</div><div class="font-bold text-red-700">'+dinero(totEgr)+'</div></div>'+
-      '<div class="bg-indigo-50 rounded-xl p-3"><div class="text-[11px] text-indigo-700 uppercase">Resultado</div><div class="font-bold '+((totIng-totEgr)>=0?'text-indigo-700':'text-red-700')+'">'+dinero(totIng-totEgr)+'</div></div>'+
+      '<div class="bg-emerald-50 rounded-xl p-3"><div class="text-[11px] text-emerald-700 uppercase">Ingresos</div><div class="kpiv font-bold text-emerald-700">'+dinero(totIng)+'</div></div>'+
+      '<div class="bg-red-50 rounded-xl p-3"><div class="text-[11px] text-red-700 uppercase">Egresos</div><div class="kpiv font-bold text-red-700">'+dinero(totEgr)+'</div></div>'+
+      '<div class="bg-indigo-50 rounded-xl p-3"><div class="text-[11px] text-indigo-700 uppercase">Resultado</div><div class="kpiv font-bold '+((totIng-totEgr)>=0?'text-indigo-700':'text-red-700')+'">'+dinero(totIng-totEgr)+'</div></div>'+
     '</div>'+
     '<h4 class="text-sm font-bold text-emerald-700 uppercase tracking-wide mb-1 mt-4">Ingresos por categoría</h4>'+tabla(ing,'Ingresos','emerald')+
     '<h4 class="text-sm font-bold text-red-700 uppercase tracking-wide mb-1 mt-4">Egresos por categoría</h4>'+tabla(egr,'Egresos','red')+
@@ -5178,6 +5235,7 @@ async function entrarApp(){
   mostrar('appView');
   pintarMenu();
   ir('dashboard');
+  rtIniciar();
 }
 
 /* Tabs del login */
@@ -5213,6 +5271,230 @@ document.getElementById('formR').onsubmit=async function(e){
     msg.innerHTML='<span class="text-emerald-600">Cuenta creada. Ya puedes iniciar sesión.</span>';
   }catch(err){ msg.innerHTML='<span class="text-red-600">'+esc(err.message)+'</span>'; }
 };
+
+/* =====================================================================
+   TIEMPO REAL · Supabase Realtime por WebSocket nativo (sin librerías)
+   Cualquier cambio en la base de datos —hecho desde otro teléfono o PC—
+   actualiza la pantalla abierta sin recargar.
+   ===================================================================== */
+var RT={ ws:null, ref:0, joinRef:null, hb:null, estado:'off', intentos:0, timer:null, tRe:null, tAsis:null, pend:false, corriendo:false,
+         ultimo:0, ultimoMsg:0, token:null, conectoAntes:false, swap:null, topic:'realtime:adulam' };
+var RT_CACHE={ members:1, families:1, teams:1, houses:1, meeting_types:1 };
+var DISC_VISTA=null;
+
+/* Recordar en qué sub-pantalla está el usuario para repintar la correcta */
+['verCursos','verCurso','verPromo'].forEach(function(n){ var o=window[n]; if(typeof o!=='function') return; window[n]=function(a){ DISC_VISTA=[n,a]; return o.apply(this,arguments); }; });
+(function(){ var o1=window.verPlan, o2=window.pintarSemana;
+  window.verPlan=function(){ SV.enPlan=true; return o1.apply(this,arguments); };
+  window.pintarSemana=function(){ SV.enPlan=false; return o2.apply(this,arguments); };
+})();
+
+async function rtTesoreria(){
+  if(TZ.caja){
+    var el=document.getElementById('tzMesC'), mes=el?el.value:null;
+    await tzVerCaja(TZ.caja);
+    var e2=document.getElementById('tzMesC'); if(e2&&mes&&e2.value!==mes){ e2.value=mes; await pintarMovsCaja(); }
+    return;
+  }
+  var f={ cajas:pintarCajas, movs:cargarMovs, revision:cargarRevision, informe:pintarInforme, presupuesto:pintarPresupuesto,
+          recibos:pintarRecibos, arqueo:pintarArqueos, cierre:pintarCierres, cats:pintarCats }[TZ.tab];
+  if(f){ if(TZ.tab==='cajas'||TZ.tab==='cats') await f(); else { await tzCajas(true); await f(); } }
+}
+
+/* Qué tablas afectan a cada pantalla y cómo se repinta sin perder filtros.
+   t:'*' = cualquier tabla · full = repinta también los controles (se espera a que el usuario deje de escribir)
+   silencioso = se arma fuera de pantalla y se cambia de golpe (sin parpadeo) · cada = mínimo de ms entre repintados */
+var RT_VISTAS={
+  dashboard:   { t:'*', fn:function(){ return view_dashboard(); }, silencioso:1, cada:5000 },
+  alertas:     { t:'*', fn:function(){ return view_alertas(); },   silencioso:1, cada:5000 },
+  stats:       { t:'*', fn:function(){ return view_stats(); },     silencioso:1, cada:12000 },
+  members:     { t:['members','member_teams','member_houses','families','teams','houses'], fn:function(){ return pintarMiembros(); } },
+  visitors:    { t:['visitors','followups','visitor_attendance'], fn:function(){ return pintarVisitas(); } },
+  birthdays:   { t:['members','families'], fn:function(){ return pintarCumples(); } },
+  families:    { t:['families','members'], fn:function(){ return pintarFamilias(); } },
+  houses:      { t:['houses','member_houses','cajas','members'], fn:function(){ return pintarCasas(); } },
+  teams:       { t:['teams','member_teams','members'], fn:function(){ return pintarEquipos(); } },
+  attendance:  { t:['service_plans','meeting_types'], fn:function(){ return cargarServiciosDia(); } },
+  discipleship:{ t:['discipleship_courses','discipleship_lessons','discipleship_cohorts','discipleship_participants','discipleship_attendance'],
+                 fn:function(){ var v=DISC_VISTA||['verCursos']; return window[v[0]](v[1]); }, full:1 },
+  decisiones:  { t:['decisiones','members'], fn:function(){ return pintarDecisiones(); } },
+  prayers:     { t:['prayer_requests','prayer_log'], fn:function(){ return pintarOraciones(); } },
+  services:    { t:['service_plans','service_tasks','meeting_types'], fn:function(){ return (SV.enPlan&&SV.plan)?verPlan(SV.plan):pintarSemana(); }, full:function(){ return !!SV.enPlan; } },
+  treasury:    { t:['treasury','cajas','caja_responsables','caja_categorias','comprobantes','cierres_mes','arqueos','presupuestos','recibos'],
+                 fn:rtTesoreria, full:function(){ return !TZ.caja && ['cajas','movs','revision'].indexOf(TZ.tab)===-1; } },
+  pastoral:    { t:['ingresos_pastorales','members'], fn:function(){ return pintarPastoral(); }, full:1 },
+  metas:       { t:['metas','actividades','actividad_participantes','treasury'], fn:function(){ return pintarMetas(); } },
+  social:      { t:['social_posts'], fn:function(){ return pintarPosts(); } },
+  automations: { t:['automation_logs'], fn:function(){ return pintarLogs(); } },
+  users:       { t:['profiles','caja_responsables','members'], fn:function(){ return pintarUsuarios(); } }
+};
+
+function rtEstado(e){
+  RT.estado=e;
+  var d=document.getElementById('rtDot'); if(!d) return;
+  var on=e==='on';
+  d.title=on?'Tiempo real activo: los cambios aparecen solos':'Sin conexión en vivo. Reconectando…';
+  d.innerHTML='<span class="relative flex w-2 h-2">'+(on?'<span class="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60 animate-ping"></span>':'')+
+    '<span class="relative inline-flex rounded-full w-2 h-2 '+(on?'bg-emerald-500':'bg-amber-400')+'"></span></span>'+
+    '<span class="hidden sm:inline '+(on?'text-emerald-700':'text-amber-600')+'">'+(on?'En vivo':'Reconectando')+'</span>';
+}
+function rtEnviar(m){ try{ if(RT.ws && RT.ws.readyState===1) RT.ws.send(JSON.stringify(m)); }catch(e){} }
+
+async function rtConectar(){
+  if(!S.session || !S.user) return;
+  if(RT.ws && (RT.ws.readyState===0 || RT.ws.readyState===1)) return;
+  if(RT.conectando) return; RT.conectando=true;
+  try{
+    if((await asegurarSesion())!=='ok'){ RT.conectando=false; rtReintentar(); return; }
+    var ws=new WebSocket(URL_BASE.replace(/^http/,'ws')+'/realtime/v1/websocket?apikey='+encodeURIComponent(ANON)+'&vsn=1.0.0');
+  }catch(e){ RT.conectando=false; rtReintentar(); return; }
+  RT.conectando=false; RT.ws=ws;
+  ws.onopen=function(){
+    if(RT.ws!==ws) return;
+    RT.joinRef=String(++RT.ref); RT.token=S.session.access_token; RT.ultimoMsg=Date.now();
+    rtEnviar({ topic:RT.topic, event:'phx_join', ref:RT.joinRef, join_ref:RT.joinRef,
+      payload:{ config:{ broadcast:{ack:false,self:false}, presence:{key:'',enabled:false}, postgres_changes:[{event:'*',schema:'public'}], private:false }, access_token:RT.token } });
+    clearInterval(RT.hb); RT.hb=setInterval(rtLatido,20000);
+  };
+  ws.onmessage=function(ev){ if(RT.ws!==ws) return; var m; try{ m=JSON.parse(ev.data); }catch(e){ return; } RT.ultimoMsg=Date.now(); rtMensaje(m); };
+  ws.onclose=function(){ if(RT.ws!==ws) return; RT.ws=null; clearInterval(RT.hb); rtEstado('off'); rtReintentar(); };
+  ws.onerror=function(){ try{ ws.close(); }catch(e){} };
+}
+function rtReintentar(){
+  clearTimeout(RT.tRe);
+  if(!S.session) return;
+  var ms=Math.min(30000, 1000*Math.pow(2,RT.intentos++))+Math.floor(Math.random()*500);
+  RT.tRe=setTimeout(rtConectar, ms);
+}
+function rtCortar(){ var w=RT.ws; if(w){ try{ w.close(); }catch(e){} } }
+async function rtLatido(){
+  if(!RT.ws || RT.ws.readyState!==1) return;
+  if(Date.now()-RT.ultimoMsg>50000){ rtCortar(); return; }       // conexión colgada: reconectar
+  rtEnviar({ topic:'phoenix', event:'heartbeat', payload:{}, ref:String(++RT.ref) });
+  // Mantener la sesión viva: renovar el token antes de que venza y avisarle al canal
+  if(S.session && S.session.expires_at && (Date.now()/1000) > (S.session.expires_at-180) && S.session.refresh_token){
+    await asegurarSesion(true);
+  }
+  if(S.session && S.session.access_token && S.session.access_token!==RT.token){
+    RT.token=S.session.access_token;
+    rtEnviar({ topic:RT.topic, event:'access_token', payload:{ access_token:RT.token }, ref:String(++RT.ref), join_ref:RT.joinRef });
+  }
+}
+function rtMensaje(m){
+  if(m.event==='postgres_changes'){ if(m.payload && m.payload.data) rtCambio(m.payload.data); return; }
+  if(m.event==='phx_reply' && m.ref===RT.joinRef && m.topic===RT.topic){
+    if(m.payload && m.payload.status==='ok'){
+      RT.intentos=0; rtEstado('on');
+      if(RT.conectoAntes){ Object.keys(RT_CACHE).forEach(rtRecache); TZ.cats=[]; TZ.perfiles=[]; TZ.org=null; RT.pend=true; rtProgramar(300); }   // pudo perderse algo mientras estuvo desconectado
+      RT.conectoAntes=true;
+    } else { console.warn('Tiempo real: no se pudo suscribir', m.payload); rtCortar(); }
+    return;
+  }
+  if(m.topic===RT.topic && (m.event==='phx_error' || m.event==='phx_close')){ rtCortar(); return; }
+  if(m.event==='system' && m.payload && m.payload.status==='error'){ console.warn('Tiempo real:', m.payload.message); }
+}
+
+function rtCambio(d){
+  var tabla=d.table, r=d.record||{}, v=vistaActual;
+  if(RT_CACHE[tabla]) rtRecache(tabla);
+  if(tabla==='caja_categorias') TZ.cats=[];
+  if(tabla==='profiles') TZ.perfiles=[];
+  if(tabla==='actividades' || tabla==='metas') TZ.org=null;
+  // Me cambiaron el rol o el nombre: aplicar al instante
+  if(tabla==='profiles' && S.user && r.id===S.user.id && d.type!=='DELETE'){
+    var antes=rol(); S.profile=Object.assign({}, S.profile, r);
+    var un=document.getElementById('userName'), ur=document.getElementById('userRole');
+    if(un) un.textContent=S.profile.nombre||'Usuario'; if(ur) ur.textContent=S.profile.rol||'miembro';
+    pintarMenu();
+    if(antes!==rol()){ toast('Tu rol cambió a '+rol(),'info'); ir('dashboard'); return; }
+  }
+  if(tabla==='caja_responsables' && S.user){
+    dbGet('caja_responsables','user_id=eq.'+S.user.id+'&select=caja_id').then(function(mc){ if(mc.length!==S.misCajas){ S.misCajas=mc.length; pintarMenu(); } }).catch(function(){});
+  }
+  // Asistencia: se aplica la marca directamente (varias personas pasando lista a la vez)
+  if(v==='attendance' && (tabla==='attendance' || tabla==='visitor_attendance')){
+    if(!A.servicio) return;
+    clearTimeout(RT.tAsis);
+    if(d.type!=='DELETE' && r.fecha){
+      if(r.fecha!==A.servicio.fecha || r.meeting_type_id!==A.servicio.meeting_type_id) return;
+      if(tabla==='attendance') A.mapa[r.member_id]=r; else { A.mapaVis=A.mapaVis||{}; A.mapaVis[r.visitor_id]=r; }
+      RT.tAsis=setTimeout(function(){ if(vistaActual==='attendance' && A.servicio) pintarAsistencia(); },150);
+    } else {
+      RT.tAsis=setTimeout(function(){ if(vistaActual==='attendance' && A.servicio) elegirServicio(A.servicio.id); },400);
+    }
+    return;
+  }
+  var cfg=RT_VISTAS[v];
+  if(cfg && (cfg.t==='*' || cfg.t.indexOf(tabla)!==-1)){ RT.pend=true; rtProgramar(); }
+}
+
+/* Los catálogos en memoria (miembros, familias, ministerios…) se recargan sin vaciarlos, para que los formularios nunca queden sin opciones */
+function rtRecache(t){
+  if(!S.cache[t] || !S.cacheQ || !(t in S.cacheQ)) return;
+  RT.tCache=RT.tCache||{}; clearTimeout(RT.tCache[t]);
+  RT.tCache[t]=setTimeout(function(){ dbGet(t, S.cacheQ[t]).then(function(d){ if(S.cache[t]) S.cache[t]=d; }).catch(function(){}); }, 400);
+}
+function rtProgramar(ms){ clearTimeout(RT.timer); RT.timer=setTimeout(rtRefrescar, ms||700); }
+function rtModalAbierto(){
+  if(document.querySelector('body > div.fixed.inset-0.z-50')) return true;
+  var b=document.getElementById('mBusq'); return !!(b && !b.classList.contains('hidden'));
+}
+function rtEscribiendo(){
+  var a=document.activeElement, pg=document.getElementById('page');
+  return !!(a && pg && pg.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.type!=='checkbox' && a.type!=='radio');
+}
+/* Arma la pantalla nueva fuera de vista y la cambia de golpe: sin parpadeo de "cargando" */
+async function rtSilencioso(fn, v){
+  var real=document.getElementById('page'), tmp=document.createElement('div'), ok=false;
+  tmp.className=real.className; tmp.setAttribute('aria-hidden','true');
+  tmp.style.cssText='position:absolute;visibility:hidden;pointer-events:none;max-height:0;overflow:hidden;top:'+real.offsetTop+'px;left:'+real.offsetLeft+'px;width:'+real.offsetWidth+'px';
+  real.parentNode.insertBefore(tmp, real); real.id='page_viva'; tmp.id='page';
+  RT.swap={ real:real, tmp:tmp, cancel:false };
+  try{ await fn(); ok=true; }
+  finally{
+    var s=RT.swap; RT.swap=null;
+    if(!s.cancel){ tmp.id=''; real.id='page'; if(ok && vistaActual===v && tmp.childNodes.length) real.replaceChildren.apply(real, Array.prototype.slice.call(tmp.childNodes)); }
+    tmp.remove(); ri();
+  }
+}
+async function rtRefrescar(){
+  if(!RT.pend) return;
+  var v=vistaActual, cfg=RT_VISTAS[v];
+  if(!cfg){ RT.pend=false; return; }
+  if(document.hidden || rtModalAbierto()) return;                 // se retoma al volver / al cerrar la ventana
+  var full=(typeof cfg.full==='function')?cfg.full():(cfg.full||cfg.silencioso);
+  if(full && rtEscribiendo()){ rtProgramar(2500); return; }
+  if(RT.corriendo){ rtProgramar(800); return; }
+  var falta=(cfg.cada||1500)-(Date.now()-RT.ultimo);
+  if(falta>0){ rtProgramar(falta); return; }
+  RT.pend=false; RT.corriendo=true;
+  var pg=document.getElementById('page'), y=window.scrollY;
+  try{
+    if(cfg.silencioso) await rtSilencioso(cfg.fn, v);
+    else { pg.style.minHeight=pg.offsetHeight+'px'; await cfg.fn(); }
+  }catch(e){ console.warn('Tiempo real: no se pudo repintar', e); }
+  finally{
+    pg.style.minHeight=''; if(vistaActual===v && Math.abs(window.scrollY-y)>2) window.scrollTo(0,y);
+    RT.corriendo=false; RT.ultimo=Date.now();
+    if(RT.pend) rtProgramar();
+  }
+}
+
+/* Al navegar se descarta lo pendiente; al cerrar una ventana se aplica lo que quedó en espera */
+(function(){
+  var irO=window.ir, cmO=window.closeModal, cbO=window.cerrarBusqueda;
+  window.ir=function(){ RT.pend=false; clearTimeout(RT.timer); if(RT.swap){ RT.swap.cancel=true; RT.swap.tmp.id=''; RT.swap.real.id='page'; } return irO.apply(this,arguments); };
+  window.closeModal=function(){ var x=cmO.apply(this,arguments); if(RT.pend) rtProgramar(350); return x; };
+  if(typeof cbO==='function') window.cerrarBusqueda=function(){ var x=cbO.apply(this,arguments); if(RT.pend) rtProgramar(350); return x; };
+})();
+document.addEventListener('visibilitychange', function(){
+  if(document.hidden || !S.session) return;
+  if(!RT.ws || RT.ws.readyState>1){ RT.intentos=0; clearTimeout(RT.tRe); rtConectar(); }
+  else if(Date.now()-RT.ultimoMsg>50000){ rtCortar(); }
+  if(RT.pend) rtProgramar(200);
+});
+window.addEventListener('online', function(){ if(S.session && (!RT.ws || RT.ws.readyState>1)){ RT.intentos=0; clearTimeout(RT.tRe); rtConectar(); } });
+function rtIniciar(){ rtEstado('off'); RT.intentos=0; rtConectar(); }
 
 /* Inicio */
 (async function init(){
